@@ -35,6 +35,10 @@ pub struct User {
     pub username: String,
     pub password: String,   // stored plain-text for simplicity
     pub role:     UserRole,
+    /// If Some, viewer users can only see/control these server IDs.
+    /// None means unrestricted (all servers). Ignored for admin role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_servers: Option<Vec<String>>,
 }
 
 /// What we expose over the API (no password).
@@ -42,11 +46,16 @@ pub struct User {
 pub struct UserInfo {
     pub username: String,
     pub role:     UserRole,
+    pub allowed_servers: Option<Vec<String>>,
 }
 
 impl From<&User> for UserInfo {
     fn from(u: &User) -> Self {
-        UserInfo { username: u.username.clone(), role: u.role.clone() }
+        UserInfo {
+            username: u.username.clone(),
+            role: u.role.clone(),
+            allowed_servers: u.allowed_servers.clone(),
+        }
     }
 }
 
@@ -78,6 +87,7 @@ impl UserStore {
                 username: "admin".into(),
                 password: "admin".into(),
                 role:     UserRole::Admin,
+                allowed_servers: None,
             }];
             let raw = serde_json::to_string_pretty(&defaults)?;
             std::fs::write(&path, &raw).context("writing users.json")?;
@@ -115,7 +125,7 @@ impl UserStore {
         if username.is_empty() || password.is_empty() {
             anyhow::bail!("username and password must not be empty");
         }
-        inner.users.push(User { username: username.into(), password: password.into(), role });
+        inner.users.push(User { username: username.into(), password: password.into(), role, allowed_servers: None });
         Self::save(&inner)
     }
 
@@ -157,5 +167,21 @@ impl UserStore {
         self.inner.read().unwrap()
             .users.iter().find(|u| u.username == username)
             .map(|u| u.role.clone())
+    }
+
+    /// Get the list of server IDs this user can access (None = all).
+    pub fn allowed_servers(&self, username: &str) -> Option<Vec<String>> {
+        self.inner.read().unwrap()
+            .users.iter().find(|u| u.username == username)
+            .and_then(|u| u.allowed_servers.clone())
+    }
+
+    /// Set which server IDs a viewer can access. Pass None to allow all.
+    pub fn set_allowed_servers(&self, username: &str, ids: Option<Vec<String>>) -> Result<()> {
+        let mut inner = self.inner.write().unwrap();
+        let user = inner.users.iter_mut().find(|u| u.username == username)
+            .ok_or_else(|| anyhow::anyhow!("user not found"))?;
+        user.allowed_servers = ids;
+        Self::save(&inner)
     }
 }

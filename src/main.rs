@@ -121,6 +121,7 @@ fn build_router(state: AppState) -> Router {
         // ── User management (admin only) ──────────────────────────────────
         .route("/api/users",               get(handlers::users_list).post(handlers::users_create))
         .route("/api/users/:username",     put(handlers::users_update).delete(handlers::users_delete))
+        .route("/api/users/:username/servers", put(handlers::users_set_servers))
         .route("/api/users/:username/password", post(handlers::users_change_password))
         // ── Public status (no auth) ───────────────────────────────────────
         .route("/api/public/:id/status",   get(handlers::public_status))
@@ -129,6 +130,7 @@ fn build_router(state: AppState) -> Router {
         .route("/s/:id",                   get(handlers::serve_status_page))
         // ── Frontend ──────────────────────────────────────────────────────
         .route("/login",                    get(handlers::serve_login))
+        .route("/view",                     get(handlers::serve_viewer))
         .route("/",                         get(handlers::serve_frontend))
         .with_state(state)
         .layer(cors)

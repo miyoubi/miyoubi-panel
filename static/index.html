@@ -1204,6 +1204,8 @@ window.addEventListener('load', async function() {
     document.getElementById('sb-uname').textContent = currentUser;
     var roleEl = document.getElementById('sb-user-role');
     if (roleEl) roleEl.textContent = (data.role === 'admin') ? 'Administrator' : 'Viewer';
+    // Redirect viewer users to the minimal viewer UI
+    if (currentUserRole === 'viewer') { window.location.replace('/view'); return; }
     applyRoleRestrictions();
     loadServers();
   } catch(e) { window.location.replace('/login'); }
@@ -2165,17 +2167,58 @@ async function loadUsers() {
     listEl.innerHTML = '';
     if (users.length === 0) { listEl.innerHTML = '<div style="color:var(--muted);font-size:0.78rem">No users</div>'; return; }
     users.forEach(function(u) {
+      var isSelf = u.username === currentUser;
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:10px';
+      // Main row
       var row = document.createElement('div');
       row.className = 'user-row';
-      var isSelf = u.username === currentUser;
+      row.style.borderBottom = 'none';
       row.innerHTML =
         '<div class="user-uname">' + escHtml(u.username) +
           (isSelf ? ' <span style="font-size:0.6rem;color:var(--muted)">(you)</span>' : '') + '</div>' +
         '<span class="user-role-badge ' + u.role + '">' + u.role + '</span>' +
-        (!isSelf ? '<button class="mod-btn mod-btn-remove" onclick="deleteUser(\'' + escHtml(u.username) + '\')">Remove</button>' : '');
-      listEl.appendChild(row);
+        (!isSelf ? '<button class="mod-btn mod-btn-remove" style="margin-left:4px" onclick="deleteUser(\'' + escHtml(u.username) + '\')">Remove</button>' : '');
+      wrap.appendChild(row);
+      // Server access row — only for viewer accounts, not self
+      if (u.role === 'viewer' && !isSelf) {
+        var accessRow = document.createElement('div');
+        accessRow.style.cssText = 'margin-top:6px;padding:8px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:6px';
+        var allowed = u.allowed_servers || [];
+        var allSrvs = typeof servers !== 'undefined' ? servers : [];
+        var checkboxes = allSrvs.map(function(s) {
+          var checked = allowed.length === 0 || allowed.indexOf(s.id) !== -1;
+          return '<label style="display:flex;align-items:center;gap:6px;font-size:0.74rem;color:var(--muted);cursor:pointer;margin-bottom:4px">' +
+            '<input type="checkbox" data-uid="' + escHtml(u.username) + '" data-sid="' + escHtml(s.id) + '"' +
+            (checked ? ' checked' : '') + ' style="accent-color:#555;cursor:pointer" onchange="updateServerAccess(\'' + escHtml(u.username) + '\')">' +
+            escHtml(s.name) + '</label>';
+        }).join('');
+        accessRow.innerHTML =
+          '<div style="font-size:0.62rem;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Server Access</div>' +
+          (allSrvs.length ? checkboxes : '<div style="font-size:0.72rem;color:var(--muted2)">No servers</div>');
+        wrap.appendChild(accessRow);
+      }
+      listEl.appendChild(wrap);
     });
   } catch(e) {}
+}
+
+async function updateServerAccess(username) {
+  // Collect checked server IDs for this user
+  var allChecked = document.querySelectorAll('input[data-uid="' + username + '"]:checked');
+  var allBoxes   = document.querySelectorAll('input[data-uid="' + username + '"]');
+  // If all checked → send null (unrestricted). Otherwise send the list.
+  var ids = allChecked.length === allBoxes.length
+    ? null
+    : Array.from(allChecked).map(function(el) { return el.dataset.sid; });
+  try {
+    var r = await fetch('/api/users/' + encodeURIComponent(username) + '/servers', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ server_ids: ids })
+    });
+    var d = await r.json();
+    toast(d.ok ? 'Access updated' : (d.message || 'Failed'), d.ok ? 'ok' : 'err');
+  } catch(e) { toast('Failed to update access', 'err'); }
 }
 
 async function createUser() {

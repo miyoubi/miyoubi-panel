@@ -57,16 +57,33 @@ where
 
 // ── Frontend ──────────────────────────────────────────────────────────────
 
-static INDEX_HTML: &str = include_str!("../static/index.html");
-static LOGIN_HTML: &str = include_str!("../static/login.html");
+static INDEX_HTML:  &str = include_str!("../static/index.html");
+static LOGIN_HTML:  &str = include_str!("../static/login.html");
+static VIEWER_HTML: &str = include_str!("../static/viewer.html");
 
 pub async fn serve_frontend() -> Html<&'static str> { Html(INDEX_HTML) }
 pub async fn serve_login()    -> Html<&'static str> { Html(LOGIN_HTML) }
+pub async fn serve_viewer()   -> Html<&'static str> { Html(VIEWER_HTML) }
 
 // ── Server list & create ──────────────────────────────────────────────────
 
-pub async fn servers_list(State(s): State<AppState>) -> impl IntoResponse {
-    Json(s.registry.list())
+pub async fn servers_list(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let all = s.registry.list();
+    // If the caller is a viewer with a server allowlist, filter to only those servers.
+    if let Some(user) = cookie_user(&headers) {
+        if matches!(s.users.role_of(&user), Some(crate::users::UserRole::Viewer)) {
+            if let Some(allowed) = s.users.allowed_servers(&user) {
+                let filtered: Vec<_> = all.into_iter()
+                    .filter(|srv| allowed.contains(&srv.id))
+                    .collect();
+                return Json(filtered).into_response();
+            }
+        }
+    }
+    Json(all).into_response()
 }
 
 pub async fn servers_create(
@@ -571,10 +588,12 @@ pub async fn auth_me(
 ) -> impl IntoResponse {
     if let Some(user) = cookie_user(&headers) {
         if let Some(role) = s.users.role_of(&user) {
+            let allowed = s.users.allowed_servers(&user);
             return Json(serde_json::json!({
                 "ok": true,
                 "username": user,
                 "role": role.to_string(),
+                "allowed_servers": allowed,
             })).into_response();
         }
     }
@@ -688,6 +707,31 @@ pub async fn users_delete(
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({"ok":false,"message":"Forbidden"}))).into_response();
     }
     match s.users.delete(&username) {
+        Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"ok":false,"message":e.to_string()}))).into_response(),
+    }
+}
+
+// PUT /api/users/:username/servers — set allowed server IDs for a viewer.
+// Body: { "server_ids": ["id1","id2"] } or { "server_ids": null } for all.
+pub async fn users_set_servers(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(username): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    if !is_admin(&s, &headers) {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({"ok":false,"message":"Forbidden"}))).into_response();
+    }
+    let ids: Option<Vec<String>> = match body.get("server_ids") {
+        Some(serde_json::Value::Array(arr)) => {
+            Some(arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        }
+        Some(serde_json::Value::Null) | None => None,
+        _ => return (StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"ok":false,"message":"server_ids must be an array or null"}))).into_response(),
+    };
+    match s.users.set_allowed_servers(&username, ids) {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"ok":false,"message":e.to_string()}))).into_response(),
     }
