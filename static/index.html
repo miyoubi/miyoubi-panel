@@ -1,0 +1,2872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Miyoubi Panel</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="shortcut icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0a0a;--sb:#111;--card:#141414;--card2:#1a1a1a;
+  --border:#222;--border2:#2a2a2a;--text:#e8e8e8;--muted:#666;--muted2:#444;
+  --accent:#fff;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--blue:#3b82f6;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow:hidden;font-size:14px}
+
+
+.form-input:focus{border-color:#444}
+.form-input::placeholder{color:var(--muted2)}
+
+/* Shell */
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* Sidebar */
+.sidebar{width:220px;min-width:220px;background:var(--sb);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-logo{padding:14px 16px;display:flex;align-items:center;gap:10px}
+.sb-logo-icon{width:28px;height:28px;background:var(--card2);border:1px solid var(--border2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;overflow:hidden}
+.sb-logo-text{font-size:0.88rem;font-weight:600;letter-spacing:-.01em}
+.sb-logo-text span{color:var(--muted);font-weight:400}
+.sb-divider{height:1px;background:var(--border);margin:0 16px}
+.sb-section{padding:16px 16px 5px;font-size:0.6rem;font-weight:600;color:var(--muted2);letter-spacing:.12em;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 12px;margin:1px 8px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;color:var(--muted);transition:color .12s,background .12s;text-decoration:none}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.nav-item.active{color:var(--text);background:rgba(255,255,255,.07)}
+.nav-icon{width:14px;height:14px;flex-shrink:0;opacity:.6}
+.nav-item.active .nav-icon{opacity:1}
+.sb-servers{flex:1;overflow-y:auto;padding:0 0 4px}
+.sb-servers::-webkit-scrollbar{width:0}
+.srv-list-item{display:flex;align-items:center;gap:9px;padding:7px 12px;margin:1px 8px;border-radius:6px;cursor:pointer;transition:background .12s}
+.srv-list-item:hover{background:rgba(255,255,255,.05)}
+.srv-list-item.active{background:rgba(255,255,255,.07)}
+.srv-list-dot{width:5px;height:5px;border-radius:50%;background:var(--muted2);flex-shrink:0;transition:background .3s}
+.srv-list-dot.on{background:var(--green)}
+.srv-list-name{font-size:0.79rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);transition:color .12s}
+.srv-list-item.active .srv-list-name,.srv-list-item:hover .srv-list-name{color:var(--text)}
+.srv-add-btn{display:flex;align-items:center;gap:7px;padding:6px 11px;margin:4px 8px 8px;border-radius:6px;cursor:pointer;font-size:0.76rem;color:var(--muted2);transition:color .12s,background .12s;border:1px dashed var(--border2);background:transparent;width:calc(100% - 16px);text-align:left}
+.srv-add-btn:hover{color:var(--muted);border-color:var(--border)}
+.sb-bottom{border-top:1px solid var(--border);flex-shrink:0}
+.sb-user{padding:10px 14px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:background .12s}
+.sb-user:hover{background:rgba(255,255,255,.04)}
+.sb-avatar{width:27px;height:27px;border-radius:50%;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:0.65rem;color:var(--muted);font-weight:600;flex-shrink:0}
+.sb-user-name{font-size:0.78rem;font-weight:500;line-height:1.2}
+.sb-user-role{font-size:0.63rem;color:var(--muted)}
+.sb-version{font-size:0.58rem;color:var(--muted2);padding:5px 15px 10px;letter-spacing:.02em}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.srv-header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;background:var(--sb);flex-shrink:0}
+.srv-icon{width:44px;height:44px;border-radius:8px;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.srv-title{font-size:1.1rem;font-weight:600;letter-spacing:-.01em}
+.srv-desc{font-size:0.72rem;color:var(--muted);margin-top:2px}
+.srv-meta{font-size:0.65rem;color:var(--muted2);margin-top:2px}
+.srv-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-shrink:0}
+.act-btn{font-size:0.75rem;font-weight:500;padding:6px 14px;border-radius:5px;border:1px solid var(--border2);cursor:pointer;background:var(--card2);color:var(--text);display:flex;align-items:center;gap:6px;transition:background .12s,border-color .12s,color .12s}
+.act-btn:disabled{opacity:.3;cursor:not-allowed}
+.act-btn:hover:not(:disabled){background:var(--card);border-color:#555}
+.act-btn-stop:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+.act-btn-restart:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.act-btn-delete:hover:not(:disabled){border-color:var(--red);color:var(--red)}
+.act-btn-start:hover:not(:disabled){border-color:var(--green);color:var(--green)}
+
+/* Stats */
+.content-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.content-inner{padding:16px 22px 0;flex-shrink:0}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr 1.1fr;gap:10px;margin-bottom:14px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px}
+.stat-card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.stat-card-label{font-size:0.65rem;font-weight:500;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.stat-card-sub{font-size:0.6rem;color:var(--muted2);margin-top:2px}
+.stat-card-icon{width:28px;height:28px;border-radius:6px;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.waveform{display:flex;align-items:flex-end;gap:3px;height:36px;margin-bottom:8px}
+.w-bar{width:4px;border-radius:2px;background:var(--border2);height:6px;transition:background .4s}
+.waveform.running .w-bar{background:var(--green);animation:wave 1.1s ease-in-out infinite}
+.waveform.running .w-bar:nth-child(1){animation-delay:.00s}
+.waveform.running .w-bar:nth-child(2){animation-delay:.12s}
+.waveform.running .w-bar:nth-child(3){animation-delay:.24s}
+.waveform.running .w-bar:nth-child(4){animation-delay:.36s}
+.waveform.running .w-bar:nth-child(5){animation-delay:.48s}
+.waveform.running .w-bar:nth-child(6){animation-delay:.60s}
+@keyframes wave{0%,100%{height:5px}50%{height:30px}}
+.stat-status-text{font-size:1rem;font-weight:600;color:var(--muted)}
+.stat-status-text.running{color:var(--green)}
+.stat-status-text.stopped{color:var(--red)}
+.stat-status-sub{font-size:0.65rem;color:var(--muted);margin-top:2px}
+.conn-address{background:var(--card2);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:var(--mono);font-size:0.72rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color .15s;margin-top:4px}
+.conn-address:hover{border-color:#444}
+.copy-label{font-size:0.6rem;color:var(--muted2);font-family:var(--font)}
+.conn-hint{font-size:0.62rem;color:var(--muted2);margin-top:6px}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-key{font-size:0.65rem;color:var(--muted)}
+.info-val{font-size:0.65rem;color:var(--text);font-family:var(--mono);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perf-item{margin-bottom:8px}
+.perf-item:last-child{margin-bottom:0}
+.perf-header{display:flex;justify-content:space-between;margin-bottom:4px}
+.perf-label{font-size:0.62rem;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.perf-val{font-size:0.62rem;font-weight:600;font-family:var(--mono)}
+.perf-bar-track{height:4px;background:var(--border2);border-radius:2px;overflow:hidden}
+.perf-bar-fill{height:100%;border-radius:2px;background:#555;transition:width .6s ease,background .4s;width:0%}
+.perf-bar-fill.warn{background:var(--amber)}
+.perf-bar-fill.danger{background:var(--red)}
+
+/* Tabs */
+.tabs-bar{display:flex;border-bottom:1px solid var(--border);padding:0 20px;background:var(--sb);flex-shrink:0}
+.tab-btn{font-size:0.78rem;font-weight:500;color:var(--muted);padding:9px 14px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .12s,border-color .12s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--text);border-bottom-color:var(--text)}
+.tab-btn:disabled{opacity:.25;cursor:not-allowed}
+
+/* Tab panels */
+.tab-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.tab-panel{display:none;flex:1;flex-direction:column;overflow:hidden;padding:14px 22px 10px}
+.tab-panel.active{display:flex}
+
+/* Console */
+.console-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0}
+.console-title{font-size:0.82rem;font-weight:500;display:flex;align-items:center;gap:7px}
+.status-badge{font-size:0.58rem;font-weight:500;padding:2px 7px;border-radius:10px;background:var(--card2);color:var(--muted);border:1px solid var(--border2)}
+.status-badge.running{background:rgba(34,197,94,.1);color:var(--green);border-color:rgba(34,197,94,.2)}
+.status-badge.stopped{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.2)}
+.console-actions{margin-left:auto;display:flex;gap:5px;align-items:center}
+.con-btn{background:var(--card2);border:1px solid var(--border2);color:var(--muted);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:0.65rem;transition:color .12s,border-color .12s}
+.con-btn:hover{color:var(--text);border-color:#444}
+
+#console{flex:1;background:#0d0d0d;border:1px solid var(--border);border-radius:6px;overflow-y:auto;padding:10px 12px;font-family:var(--mono);font-size:0.72rem;line-height:1.75;color:#888}
+#console::-webkit-scrollbar{width:4px}
+#console::-webkit-scrollbar-track{background:transparent}
+#console::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.log-line{word-break:break-all}
+.log-warn{color:var(--amber)}
+.log-error{color:var(--red)}
+.log-info{color:#ccc}
+.console-input-row{display:flex;margin-top:7px;flex-shrink:0;border:1px solid var(--border2);border-radius:5px;overflow:hidden;transition:border-color .15s}
+.console-input-row:focus-within{border-color:#444}
+.input-prompt{background:var(--card2);border-right:1px solid var(--border2);padding:0 10px;display:flex;align-items:center;color:var(--muted);font-family:var(--mono);font-size:0.78rem}
+#cmd-input{flex:1;background:var(--card);border:none;outline:none;color:var(--text);padding:8px 10px;font-family:var(--mono);font-size:0.75rem}#cmd-input:disabled{color:var(--muted2);cursor:not-allowed}.console-offline-msg{display:none;align-items:center;justify-content:center;gap:8px;padding:8px 12px;margin-top:7px;background:var(--card2);border:1px solid var(--border2);border-radius:5px;font-size:0.72rem;color:var(--muted);flex-shrink:0}.console-offline-msg.visible{display:flex}
+#cmd-input::placeholder{color:var(--muted2)}
+.cmd-send{background:var(--card2);border:none;border-left:1px solid var(--border2);color:var(--muted);padding:0 12px;cursor:pointer;display:flex;align-items:center;transition:background .12s,color .12s}
+.cmd-send:hover{background:var(--card);color:var(--text)}
+.console-footer{display:flex;align-items:center;gap:14px;padding:5px 2px;font-size:0.65rem;color:var(--muted);flex-shrink:0}
+.console-footer label{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none}
+.console-footer input[type=checkbox]{accent-color:#555;cursor:pointer}
+.console-footer select{background:var(--card2);border:1px solid var(--border2);color:var(--text);font-size:0.65rem;border-radius:4px;padding:1px 4px;cursor:pointer;outline:none}
+.line-count{margin-left:auto;color:var(--muted2)}
+
+/* Players */
+.player-card{background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px}
+.player-avatar{width:30px;height:30px;border-radius:5px;background:var(--card);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--muted);font-family:var(--mono);flex-shrink:0}
+.player-name{font-size:0.78rem;font-family:var(--mono)}
+.player-status{font-size:0.6rem;color:var(--green);margin-top:1px}
+
+/* File browser */
+.breadcrumb{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:0.72rem;color:var(--muted);flex-shrink:0;margin-bottom:8px;flex-wrap:wrap}
+.breadcrumb-part{color:var(--text);cursor:pointer;padding:2px 4px;border-radius:3px;transition:background .12s}
+.breadcrumb-part:hover{background:var(--card2)}
+.breadcrumb-sep{color:var(--muted2)}
+.file-list{flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:6px;background:#0d0d0d}
+.file-list::-webkit-scrollbar{width:4px}
+.file-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.file-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;font-size:0.78rem}
+.file-item:last-child{border-bottom:none}
+.file-item:hover{background:var(--card2)}
+.file-icon{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.file-name{font-family:var(--mono);color:var(--text);flex:1}
+.file-name.dir{color:var(--blue)}
+.file-empty{padding:32px;text-align:center;color:var(--muted2);font-size:0.78rem}
+
+/* File viewer */
+.file-viewer{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.file-viewer-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0}
+.file-viewer-name{font-family:var(--mono);font-size:0.78rem;color:var(--text);flex:1}
+.file-textarea{flex:1;background:#0d0d0d;border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:0.72rem;color:#ccc;outline:none;resize:none;line-height:1.75}
+.file-textarea:focus{border-color:#444}
+
+/* Config */
+.config-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0}
+.config-filename{font-family:var(--mono);font-size:0.75rem;color:var(--muted)}
+.config-textarea{flex:1;background:#0d0d0d;border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:0.72rem;color:#ccc;outline:none;resize:none;line-height:1.75}
+.config-textarea:focus{border-color:#444}
+.save-btn{background:var(--card2);border:1px solid var(--border2);color:var(--text);padding:5px 14px;border-radius:4px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:border-color .12s,color .12s}
+.save-btn:hover{border-color:var(--green);color:var(--green)}
+
+/* Mods */
+.mod-header{display:flex;justify-content:space-between;align-items:center;flex-shrink:0;margin-bottom:8px}
+.mod-count{font-size:0.72rem;color:var(--muted)}
+.mod-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;align-content:start}
+.mod-grid::-webkit-scrollbar{width:4px}
+.mod-grid::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.mod-item{background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;position:relative}
+.mod-icon{font-size:16px;flex-shrink:0}
+.mod-name{font-family:var(--mono);font-size:0.76rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mod-actions{display:flex;flex-direction:row;gap:4px;width:auto}
+.mod-item:hover .mod-actions{display:flex}
+.mod-btn{background:var(--card);border:1px solid var(--border2);color:var(--muted);padding:4px 9px;border-radius:4px;cursor:pointer;font-size:0.65rem;transition:color .12s,border-color .12s;text-align:center}
+.mod-btn:hover{color:var(--text);border-color:#444}
+.mod-btn-remove:hover{color:var(--red);border-color:var(--red)}
+.mod-btn-disable:hover{color:var(--amber);border-color:var(--amber)}
+
+/* Modrinth search */
+.mr-search-bar{display:flex;gap:6px;margin-bottom:12px}
+.mr-search-input{flex:1;background:var(--card2);border:1px solid var(--border2);border-radius:5px;padding:7px 10px;font-family:var(--font);font-size:0.82rem;color:var(--text);outline:none;transition:border-color .15s}
+.mr-search-input:focus{border-color:#444}
+.mr-search-input::placeholder{color:var(--muted2)}
+.mr-results{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto}
+.mr-result-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:6px}
+.mr-result-icon{width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;background:var(--card)}
+.mr-result-icon-placeholder{width:36px;height:36px;border-radius:6px;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.mr-result-info{flex:1;min-width:0}
+.mr-result-name{font-size:0.8rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mr-result-desc{font-size:0.68rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.mr-result-meta{font-size:0.62rem;color:var(--muted2);margin-top:2px}
+.mr-install-btn{background:var(--card);border:1px solid var(--border2);color:var(--muted);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:0.72rem;font-weight:500;flex-shrink:0;transition:color .12s,border-color .12s,opacity .12s;white-space:nowrap}
+.mr-install-btn:hover{color:var(--green);border-color:var(--green)}
+.mr-install-btn:disabled{opacity:.4;cursor:not-allowed}
+.mr-panel{background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:14px;margin-top:4px;flex-shrink:0}
+.mr-panel-title{font-size:0.68rem;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.mod-thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.mod-thumb-placeholder{width:40px;height:40px;border-radius:6px;background:var(--card);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.mod-item{flex-direction:row;align-items:center;gap:10px}
+.mod-item-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+/* Overview */
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;overflow-y:auto}
+.ov-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px}
+.ov-card-title{font-size:0.65rem;font-weight:500;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.ov-stat{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.72rem}
+.ov-stat:last-child{border-bottom:none}
+.ov-stat-k{color:var(--muted)}
+.ov-stat-v{font-family:var(--mono);font-size:0.68rem}
+
+/* User management */
+.user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.user-row:last-child{border-bottom:none}
+/* Profile modal */
+.profile-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center}
+.profile-box{width:480px;max-width:95vw;background:var(--card);border:1px solid var(--border2);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;max-height:90vh}
+.profile-header{padding:16px 18px 14px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:12px}
+.profile-avatar{width:40px;height:40px;border-radius:50%;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:600;color:var(--text);flex-shrink:0}
+.profile-body{flex:1;overflow-y:auto;padding:16px 18px}
+.profile-section{margin-bottom:20px}
+.profile-section-title{font-size:0.68rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.user-uname{font-size:0.82rem;font-weight:500;flex:1}
+.user-role-badge{font-size:0.62rem;font-weight:600;padding:2px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.05em}
+.user-role-badge.admin{background:rgba(255,255,255,.08);color:var(--text)}
+.user-role-badge.viewer{background:rgba(59,130,246,.15);color:#60a5fa}
+.viewer-banner{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:7px 12px;font-size:0.72rem;color:#60a5fa;margin-bottom:10px;flex-shrink:0;align-items:center;gap:8px}
+.share-btn{background:var(--card2);border:1px solid var(--border2);color:var(--muted);padding:5px 11px;border-radius:5px;cursor:pointer;font-size:0.72rem;font-weight:500;display:flex;align-items:center;gap:5px;transition:color .12s,border-color .12s}
+.share-btn:hover{color:var(--text);border-color:#555}
+/* Toast */
+#toast{position:fixed;bottom:18px;right:18px;z-index:9999;background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:8px 14px;font-size:0.75rem;color:var(--text);transform:translateY(50px);opacity:0;transition:all .2s ease;max-width:280px}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.err{border-color:var(--red);color:var(--red)}
+#toast.ok{border-color:var(--green);color:var(--green)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.stat-card{animation:fadeUp .3s ease both}
+.stat-card:nth-child(1){animation-delay:.00s}
+.stat-card:nth-child(2){animation-delay:.04s}
+.stat-card:nth-child(3){animation-delay:.08s}
+.stat-card:nth-child(4){animation-delay:.12s}
+
+/* Mobile responsive - hide sidebar, make cards smaller */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+  
+  .app {
+    flex-direction: column;
+  }
+  
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 5px;
+  }
+  
+  .stat-card {
+    padding: 8px;
+    min-height: auto;
+  }
+  
+  .stat-card-header {
+    margin-bottom: 6px;
+  }
+  
+  .stat-card-label {
+    font-size: 0.55rem;
+  }
+  
+  .stat-card-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+  }
+  
+  .waveform {
+    height: 24px;
+    margin-bottom: 4px;
+  }
+  
+  .stat-status-text {
+    font-size: 0.85rem;
+  }
+  
+  .perf-item {
+    margin-bottom: 4px;
+  }
+  
+  .info-row {
+    padding: 2px 0;
+  }
+  
+  .content-wrap {
+    flex: 1;
+    overflow: hidden;
+  }
+  
+.tab-panel {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 14px 22px 10px;
+}
+
+#panel-settings .settings-content {
+  padding: 14px 22px;
+}
+  
+  .console-input-row {
+    margin-bottom: 10px;
+  }
+  
+  #console {
+    font-size: 0.65rem;
+    padding: 8px;
+  }
+}
+
+/* Desktop - show sidebar normally */
+@media (min-width: 769px) {
+  .sidebar {
+    display: flex;
+  }
+}
+
+/* Settings sidebar */
+.st-nav {
+  width: 160px; min-width: 160px;
+  border-right: 1px solid var(--border);
+  background: var(--sb);
+  display: flex; flex-direction: column;
+  padding: 8px 0;
+  overflow-y: auto; flex-shrink: 0;
+}
+.st-nav-btn {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 14px;
+  font-size: 0.78rem; font-weight: 500;
+  color: var(--muted);
+  background: transparent; border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer; text-align: left; width: 100%;
+  transition: color .12s, background .12s, border-color .12s;
+}
+.st-nav-btn:hover { color: var(--text); background: rgba(255,255,255,.03); }
+.st-nav-btn.active { color: var(--text); border-left-color: var(--text); background: var(--card2); }
+.st-nav-icon { font-size: 12px; flex-shrink: 0; opacity: .7; }
+.st-nav-btn.active .st-nav-icon { opacity: 1; }
+/* Settings content panes */
+.st-pane { display: none; flex: 1; overflow-y: auto; padding: 18px 22px; }
+.st-pane.active { display: block; }
+/* Settings section */
+.st-section { margin-bottom: 24px; }
+.st-section-title {
+  font-size: 0.62rem; font-weight: 600; font-family: var(--font);
+  color: var(--muted); letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 10px; }
+.st-field { display: flex; flex-direction: column; gap: 5px; }
+.st-label { font-size: 0.68rem; color: var(--muted); font-weight: 500; }
+.st-hint { font-size: 0.62rem; color: var(--muted2); margin-top: 2px; }
+.st-input {
+  background: var(--card2); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 4px;
+  padding: 7px 10px; font-family: var(--mono); font-size: 0.78rem;
+  width: 100%; outline: none; transition: border-color .15s;
+}
+.st-input:focus { border-color: #444; }
+.st-select {
+  background: var(--card2); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 4px;
+  padding: 7px 10px; font-size: 0.78rem;
+  width: 100%; outline: none; cursor: pointer;
+}
+.st-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.st-toggle-row:last-child { border-bottom: none; }
+.st-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.st-toggle-label { font-size: 0.78rem; color: var(--text); }
+.st-toggle-desc { font-size: 0.65rem; color: var(--muted); }
+/* Toggle switch */
+.toggle-sw { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
+.toggle-sw input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 18px;
+  background: var(--border2); cursor: pointer; transition: background .2s;
+}
+.toggle-sw input:checked + .toggle-track { background: #3a3a3a; }
+.toggle-track::after {
+  content: ''; position: absolute; left: 2px; top: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--muted); transition: transform .2s, background .2s;
+}
+.toggle-sw input:checked + .toggle-track::after {
+  transform: translateX(16px); background: var(--text);
+}
+/* Prop rows */
+.prop-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.prop-row:last-child { border-bottom: none; }
+.prop-row-key { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); flex: 1; }
+.prop-row-val {
+  background: var(--card2); border: 1px solid var(--border2);
+  color: var(--text); border-radius: 3px;
+  padding: 4px 8px; font-family: var(--mono); font-size: 0.72rem;
+  width: 140px; outline: none; transition: border-color .15s;
+}
+.prop-row-val:focus { border-color: #444; }
+/* Deprecated settings CSS — kept for reference but no longer used */
+.settings-tab-btn { transition: color .2s; }
+.settings-content { display: none; }
+.settings-content.active { display: block; }
+.prop-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+}
+
+.prop-toggle input[type="checkbox"] {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border2);
+  border-radius: 6px;
+  background: var(--card);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.prop-toggle input[type="checkbox"]:hover {
+  border-color: var(--green);
+}
+
+.prop-toggle input[type="checkbox"]:checked {
+  background: var(--green);
+  border-color: var(--green);
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='%23166534' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100%;
+}
+
+.prop-toggle input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+.prop-key {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  width: 100%;
+}
+
+.prop-value {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text);
+}
+
+@media (max-width: 768px) {
+  #properties-list {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Server creation wizard */
+.wizard-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.wizard-box{width:680px;max-width:95vw;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:32px}
+.wizard-title{font-size:1.2rem;font-weight:600;margin-bottom:6px}
+.wizard-sub{font-size:0.78rem;color:var(--muted);margin-bottom:24px}
+.server-types{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:24px}
+.server-type-btn{background:var(--card2);border:2px solid var(--border2);border-radius:8px;padding:14px 10px;cursor:pointer;text-align:center;transition:border-color .15s,background .15s}
+.server-type-btn:hover{background:var(--card);border-color:#444}
+.server-type-btn.selected{border-color:var(--accent);background:rgba(255,255,255,.04)}
+.server-type-icon{font-size:20px;margin-bottom:6px}
+.server-type-name{font-size:0.78rem;font-weight:500}
+.server-type-desc{font-size:0.62rem;color:var(--muted);margin-top:2px}
+.wizard-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.wizard-field{display:flex;flex-direction:column;gap:5px}
+.wizard-label{font-size:0.68rem;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.wizard-input{background:var(--card2);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:var(--mono);font-size:0.82rem;color:var(--text);outline:none;transition:border-color .15s}
+.wizard-input:focus{border-color:#444}
+.wizard-input::placeholder{color:var(--muted2)}
+.wizard-create-btn{width:100%;background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+.wizard-create-btn:hover{opacity:.88}
+.wizard-create-btn:disabled{opacity:.4;cursor:not-allowed}
+.wizard-err{font-size:0.75rem;color:var(--red);margin-top:10px;display:none;text-align:center}
+/* Server list in sidebar — styles now merged into sidebar block above */
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <aside class="sidebar">
+    <!-- Brand -->
+    <div class="sb-logo">
+      <div class="sb-logo-icon" id="sb-logo-icon"><span>&#x26F0;</span></div>
+      <div class="sb-logo-text">Miyoubi<span> Panel</span></div>
+    </div>
+    <div class="sb-divider"></div>
+
+    <!-- Nav -->
+    <div class="sb-section">Navigation</div>
+    <a class="nav-item active" id="nav-dashboard" onclick="goTab('console');setNav(this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M6 9a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 6 9m-1.146-2.854a.5.5 0 0 1 0 .708L3.707 8l1.147 1.146a.5.5 0 0 1-.708.708l-1.5-1.5a.5.5 0 0 1 0-.708l1.5-1.5a.5.5 0 0 1 .708 0z"/><path d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 13.5 1h-11A1.5 1.5 0 0 0 1 2.5zm1.5-12h11a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-item" id="nav-overview" onclick="goTab('overview');setNav(this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3A1.5 1.5 0 0 1 7 2.5v3A1.5 1.5 0 0 1 5.5 7h-3A1.5 1.5 0 0 1 1 5.5zM9 2.5A1.5 1.5 0 0 1 10.5 1h3A1.5 1.5 0 0 1 15 2.5v3A1.5 1.5 0 0 1 13.5 7h-3A1.5 1.5 0 0 1 9 5.5zm0 6.5A1.5 1.5 0 0 1 10.5 7.5h3A1.5 1.5 0 0 1 15 9v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 12zM1 9a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 7 9v3a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 1 12z"/></svg>
+      Overview
+    </a>
+
+    <div class="sb-divider" style="margin-top:8px"></div>
+
+    <!-- Servers -->
+    <div class="sb-section">Servers</div>
+    <div class="sb-servers">
+      <div id="server-list-sidebar"></div>
+      <button class="srv-add-btn" onclick="showWizard()">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        New server
+      </button>
+    </div>
+
+    <!-- User -->
+    <div class="sb-bottom">
+      <div class="sb-user" onclick="openProfile()" title="Profile &amp; settings">
+        <div class="sb-avatar" id="sb-avatar">A</div>
+        <div style="flex:1;min-width:0">
+          <div class="sb-user-name" id="sb-uname">Admin</div>
+          <div class="sb-user-role" id="sb-user-role">Administrator</div>
+        </div>
+        <svg style="opacity:.3;flex-shrink:0;width:13px;height:13px" viewBox="0 0 16 16" fill="currentColor"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg>
+      </div>
+      <div class="sb-version">v0.0.1</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="srv-header">
+     <div class="srv-icon" id="srv-icon"><span>&#x26F0;</span></div>
+      <div>
+        <div class="srv-title" id="srv-name">Loading...</div>
+        <div class="srv-desc">Docker Minecraft Server</div>
+        <div class="srv-meta" id="srv-meta">Fetching status...</div>
+      </div>
+      <div class="srv-actions">
+        <button class="act-btn act-btn-start" id="btn-start" onclick="action('start')" disabled>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="2,1 9,5 2,9"/></svg>Start
+        </button>
+        <button class="act-btn act-btn-stop" id="btn-stop" onclick="action('stop')" disabled>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="2" y="2" width="6" height="6"/></svg>Stop
+        </button>
+        <button class="act-btn act-btn-restart" id="btn-restart" onclick="action('restart')" disabled>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Restart
+        </button>
+        <button class="share-btn" onclick="copyShareLink()" title="Copy shareable status link">&#x1F517; Share</button>
+        <div style="width:1px;height:20px;background:var(--border2);margin:0 4px;flex-shrink:0"></div>
+        <button class="act-btn act-btn-delete" onclick="deleteServer()" title="Delete this server and all its data">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>Delete
+        </button>
+      </div>
+    </div>
+
+    <div class="content-wrap">
+      <div class="content-inner">
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <div><div class="stat-card-label">Server Status</div><div class="stat-card-sub">Live monitoring</div></div>
+              <div class="stat-card-icon">&#x2665;</div>
+            </div>
+            <div class="waveform" id="waveform">
+              <div class="w-bar"></div><div class="w-bar"></div><div class="w-bar"></div>
+              <div class="w-bar"></div><div class="w-bar"></div><div class="w-bar"></div>
+            </div>
+            <div class="stat-status-text" id="status-text">LOADING</div>
+            <div class="stat-status-sub" id="status-sub">Connecting...</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <div><div class="stat-card-label">Connection</div><div class="stat-card-sub">Server address</div></div>
+              <div class="stat-card-icon">&#x1F310;</div>
+            </div>
+            <div class="conn-address" onclick="copyAddr()">
+              <span id="conn-addr" style="font-family:var(--mono)">localhost:25565</span>
+              <span class="copy-label">Copy</span>
+            </div>
+            <div class="conn-hint" id="uptime-display">&nbsp;</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <div><div class="stat-card-label">Server Info</div><div class="stat-card-sub">Details &amp; versions</div></div>
+              <div class="stat-card-icon">&#x2139;</div>
+            </div>
+            <div class="info-row"><span class="info-key">Container</span><span class="info-val" id="info-cid">-</span></div>
+            <div class="info-row"><span class="info-key">Image</span><span class="info-val" id="info-image">-</span></div>
+            <div class="info-row"><span class="info-key">Status</span><span class="info-val" id="info-status">-</span></div>
+            <div class="info-row"><span class="info-key">Uptime</span><span class="info-val" id="info-uptime">-</span></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-header">
+              <div><div class="stat-card-label">Performance</div><div class="stat-card-sub">Resources &amp; metrics</div></div>
+              <div class="stat-card-icon">&#x25A6;</div>
+            </div>
+            <div class="perf-item">
+              <div class="perf-header"><span class="perf-label">Memory</span><span class="perf-val" id="perf-mem-val">-</span></div>
+              <div class="perf-bar-track"><div class="perf-bar-fill" id="perf-mem-bar"></div></div>
+            </div>
+            <div class="perf-item">
+              <div class="perf-header"><span class="perf-label">CPU</span><span class="perf-val" id="perf-cpu-val">-</span></div>
+              <div class="perf-bar-track"><div class="perf-bar-fill" id="perf-cpu-bar"></div></div>
+            </div>
+            <div class="perf-item" style="margin-top:4px">
+              <div class="perf-header"><span class="perf-label">Players</span><span class="perf-val" id="perf-players">-</span></div>
+              <div id="player-pips" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs-bar">
+        <button class="tab-btn" id="tab-overview" onclick="goTab('overview')">Overview</button>
+        <button class="tab-btn active" id="tab-console" onclick="goTab('console')">Console</button>
+        <button class="tab-btn" id="tab-players" onclick="goTab('players')">Players</button>
+        <button class="tab-btn" id="tab-files" onclick="goTab('files')">Files</button>
+        <button class="tab-btn" id="tab-mods" onclick="goTab('mods')">Mods</button>
+        <button class="tab-btn" id="tab-config" onclick="goTab('config')">Config</button>
+	<button class="tab-btn" id="tab-settings" onclick="goTab('settings')">Settings</button>
+      </div>
+
+      <div class="tab-content">
+
+        <!-- Overview -->
+        <div class="tab-panel" id="panel-overview">
+          <div class="overview-grid">
+            <div class="ov-card">
+              <div class="ov-card-title">Container Details</div>
+              <div class="ov-stat"><span class="ov-stat-k">Container ID</span><span class="ov-stat-v" id="ov-cid">-</span></div>
+              <div class="ov-stat"><span class="ov-stat-k">Image</span><span class="ov-stat-v" id="ov-image">-</span></div>
+              <div class="ov-stat"><span class="ov-stat-k">Status</span><span class="ov-stat-v" id="ov-status">-</span></div>
+              <div class="ov-stat"><span class="ov-stat-k">Uptime</span><span class="ov-stat-v" id="ov-uptime">-</span></div>
+            </div>
+            <div class="ov-card">
+              <div class="ov-card-title">Resource Usage</div>
+              <div class="ov-stat"><span class="ov-stat-k">CPU</span><span class="ov-stat-v" id="ov-cpu">-</span></div>
+              <div class="ov-stat"><span class="ov-stat-k">Memory Used</span><span class="ov-stat-v" id="ov-memused">-</span></div>
+              <div class="ov-stat"><span class="ov-stat-k">Memory Limit</span><span class="ov-stat-v" id="ov-memlim">-</span></div>
+              <div class="ov-stat"><span class="ov-stat-k">Memory %</span><span class="ov-stat-v" id="ov-mempct">-</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Console -->
+        <div class="tab-panel active" id="panel-console">
+  <div class="viewer-banner" id="viewer-banner" style="display:none">
+    &#x1F441; Viewer mode &mdash; you can view status &amp; players, and use Start / Stop / Restart.
+  </div>
+          <div class="console-toolbar">
+            <div class="console-title">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="color:#666"><path d="M6 9a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7A.5.5 0 0 1 6 9m-1.146-2.854a.5.5 0 0 1 0 .708L3.707 8l1.147 1.146a.5.5 0 0 1-.708.708l-1.5-1.5a.5.5 0 0 1 0-.708l1.5-1.5a.5.5 0 0 1 .708 0z"/><path d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 13.5 1h-11A1.5 1.5 0 0 0 1 2.5zm1.5-12h11a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5"/></svg>
+              Server Console <span class="status-badge" id="console-badge">offline</span>
+            </div>
+            <div class="console-actions">
+              
+              <button class="con-btn" onclick="clearConsole()">Clear</button>
+              <button class="con-btn" id="scroll-btn" onclick="toggleAutoScroll()">Auto-scroll: ON</button>
+            </div>
+          </div>
+          <div id="console"></div>
+          <div class="console-input-row">
+            <div class="input-prompt">$</div>
+            <input id="cmd-input" type="text" placeholder="Enter command..." autocomplete="off"
+                   onkeydown="if(event.key==='Enter') sendCommand()">
+            <button class="cmd-send" onclick="sendCommand()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+          <div class="console-offline-msg" id="console-offline-msg"><span>&#x25CF;</span> Server is offline &mdash; start the server to send commands</div><div class="console-footer">
+            <label><input type="checkbox" id="autoscroll-cb" checked onchange="autoScroll=this.checked"> Auto-scroll</label>
+            <span>Tail: <select id="tail-sel"><option>100</option><option selected>500</option><option>1000</option></select></span>
+            <span class="line-count" id="line-count">0 lines</span>
+          </div>
+        </div>
+
+<!-- Settings -->
+<div class="tab-panel" id="panel-settings" style="flex-direction:row;padding:0;overflow:hidden">
+
+  <!-- Settings nav sidebar -->
+  <nav class="st-nav">
+    <button class="st-nav-btn active" id="stnav-server" onclick="goST('server')">
+      <span class="st-nav-icon">&#x2699;</span> Server
+    </button>
+    <button class="st-nav-btn" id="stnav-jvm" onclick="goST('jvm')">
+      <span class="st-nav-icon">&#x2615;</span> JVM
+    </button>
+    <button class="st-nav-btn" id="stnav-resources" onclick="goST('resources')">
+      <span class="st-nav-icon">&#x1F4CA;</span> Resources
+    </button>
+    <button class="st-nav-btn" id="stnav-properties" onclick="goST('properties')">
+      <span class="st-nav-icon">&#x1F4CB;</span> Properties
+    </button>
+    <button class="st-nav-btn" id="stnav-users" onclick="goST('users')" style="display:none">
+      <span class="st-nav-icon">&#x1F465;</span> Users
+    </button>
+    <button class="st-nav-btn" id="stnav-backup" onclick="goST('backup')">
+      <span class="st-nav-icon">&#x1F4BE;</span> Backups
+    </button>
+  </nav>
+
+  <!-- Server pane -->
+  <div class="st-pane active" id="st-server">
+
+    <div class="st-section">
+      <div class="st-section-title">Server Options</div>
+      <div class="st-grid">
+        <div class="st-field">
+          <label class="st-label">Difficulty</label>
+          <select id="st-difficulty" class="st-select">
+            <option value="peaceful">Peaceful</option>
+            <option value="easy">Easy</option>
+            <option value="normal">Normal</option>
+            <option value="hard" selected>Hard</option>
+          </select>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Game Mode</label>
+          <select id="st-mode" class="st-select">
+            <option value="survival" selected>Survival</option>
+            <option value="creative">Creative</option>
+            <option value="adventure">Adventure</option>
+            <option value="spectator">Spectator</option>
+          </select>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Max Players</label>
+          <input class="st-input" id="st-maxplayers" type="number" value="20" min="1" max="1000">
+        </div>
+        <div class="st-field">
+          <label class="st-label">Level Seed</label>
+          <input class="st-input" id="st-seed" type="text" placeholder="Leave blank for random">
+        </div>
+        <div class="st-field">
+          <label class="st-label">View Distance</label>
+          <input class="st-input" id="st-viewdist" type="number" value="10" min="2" max="32">
+          <span class="st-hint">Chunks (2–32)</span>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Simulation Distance</label>
+          <input class="st-input" id="st-simdist" type="number" value="10" min="2" max="32">
+        </div>
+        <div class="st-field" style="grid-column:1/-1">
+          <label class="st-label">MOTD</label>
+          <input class="st-input" id="st-motd" type="text" placeholder="A Minecraft Server">
+        </div>
+      </div>
+    </div>
+
+    <div class="st-section">
+      <div class="st-section-title">Server Type &amp; Version</div>
+      <div class="st-grid">
+        <div class="st-field">
+          <label class="st-label">Server Type</label>
+          <select id="st-type" class="st-select">
+            <option value="VANILLA">Vanilla</option>
+            <option value="FABRIC" selected>Fabric</option>
+            <option value="FORGE">Forge</option>
+            <option value="NEOFORGE">NeoForge</option>
+            <option value="PAPER">Paper</option>
+            <option value="PURPUR">Purpur</option>
+            <option value="SPIGOT">Spigot</option>
+            <option value="QUILT">Quilt</option>
+            <option value="FOLIA">Folia</option>
+          </select>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Minecraft Version</label>
+          <input class="st-input" id="st-version" type="text" placeholder="LATEST">
+          <span class="st-hint">e.g. 1.21.1 or LATEST</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="st-section">
+      <div class="st-section-title">Features</div>
+      <div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">Online Mode</span>
+            <span class="st-toggle-desc">Authenticate players with Mojang servers</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="st-online-mode" checked><span class="toggle-track"></span></label>
+        </div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">PvP</span>
+            <span class="st-toggle-desc">Allow player vs player damage</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="st-pvp" checked><span class="toggle-track"></span></label>
+        </div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">Whitelist</span>
+            <span class="st-toggle-desc">Only allow listed players to join</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="st-whitelist"><span class="toggle-track"></span></label>
+        </div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">Allow Flight</span>
+            <span class="st-toggle-desc">Allow flying in survival mode</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="st-flight"><span class="toggle-track"></span></label>
+        </div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">AutoPause</span>
+            <span class="st-toggle-desc">Pause server when no players online</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="st-autopause"><span class="toggle-track"></span></label>
+        </div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">AutoStop</span>
+            <span class="st-toggle-desc">Stop container when no players online</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="st-autostop"><span class="toggle-track"></span></label>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="applyServerSettings()" style="width:100%">Apply Server Settings</button>
+  </div>
+
+  <!-- JVM pane -->
+  <div class="st-pane" id="st-jvm">
+
+    <div class="st-section">
+      <div class="st-section-title">Memory</div>
+      <div class="st-grid">
+        <div class="st-field">
+          <label class="st-label">Initial Memory (INIT_MEMORY)</label>
+          <input class="st-input" id="jvm-init-mem" type="text" placeholder="1G">
+          <span class="st-hint">e.g. 512M, 1G. Heap Xms value.</span>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Max Memory (MAX_MEMORY)</label>
+          <input class="st-input" id="jvm-max-mem" type="text" placeholder="3G">
+          <span class="st-hint">e.g. 3G, 8G. Heap Xmx value.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="st-section">
+      <div class="st-section-title">JVM Flags</div>
+      <div class="st-grid">
+        <div class="st-field" style="grid-column:1/-1">
+          <label class="st-label">Extra JVM Options (JVM_OPTS)</label>
+          <input class="st-input" id="jvm-opts" type="text" placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=50">
+          <span class="st-hint">Appended to the Java command line. Space-separated flags.</span>
+        </div>
+        <div class="st-field" style="grid-column:1/-1">
+          <label class="st-label">Extra JVM DD Options (JVM_DD_OPTS)</label>
+          <input class="st-input" id="jvm-dd-opts" type="text" placeholder="subnautica.item.damage=2">
+          <span class="st-hint">-D flags without the -D prefix. Colon-separated pairs, e.g. key=value:key2=value2</span>
+        </div>
+        <div class="st-field" style="grid-column:1/-1">
+          <label class="st-label">Extra Args (EXTRA_ARGS)</label>
+          <input class="st-input" id="jvm-extra-args" type="text" placeholder="--nogui">
+          <span class="st-hint">Arguments appended after the jar file. Rarely needed.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="st-section">
+      <div class="st-section-title">Aikar&apos;s Flags</div>
+      <div>
+        <div class="st-toggle-row">
+          <div class="st-toggle-info">
+            <span class="st-toggle-label">Use Aikar&apos;s Flags (JVM_XX_OPTS)</span>
+            <span class="st-toggle-desc">Recommended G1GC tuning flags for Minecraft — improves GC pause times</span>
+          </div>
+          <label class="toggle-sw"><input type="checkbox" id="jvm-aikars" checked><span class="toggle-track"></span></label>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:var(--card2);border:1px solid var(--border2);border-radius:4px;font-family:var(--mono);font-size:0.65rem;color:var(--muted);line-height:1.8">
+        -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200<br>
+        -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC<br>
+        -XX:+AlwaysPreTouch -XX:G1NewSizePercent=30<br>
+        -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M<br>
+        -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5<br>
+        -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15<br>
+        -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5<br>
+        -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1
+      </div>
+    </div>
+
+    <div class="st-section">
+      <div class="st-section-title">Timezone &amp; Locale</div>
+      <div class="st-grid">
+        <div class="st-field">
+          <label class="st-label">Timezone (TZ)</label>
+          <input class="st-input" id="jvm-tz" type="text" placeholder="UTC">
+          <span class="st-hint">e.g. America/New_York, Asia/Tokyo</span>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Java Tool Options (JAVA_TOOL_OPTIONS)</label>
+          <input class="st-input" id="jvm-tool-opts" type="text" placeholder="">
+          <span class="st-hint">Set via environment; overrides everything else</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="applyJvmSettings()" style="width:100%">Apply JVM Settings</button>
+  </div>
+
+  <!-- Resources pane -->
+  <div class="st-pane" id="st-resources">
+    <div class="st-section">
+      <div class="st-section-title">Docker Resource Limits</div>
+      <div class="st-grid">
+        <div class="st-field">
+          <label class="st-label">CPU Limit</label>
+          <input class="st-input res-field" id="res-cpu-limit" data-key="cpus" type="text" placeholder="2.0">
+          <span class="st-hint">Number of CPU cores (e.g. 2.0)</span>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Memory Limit</label>
+          <input class="st-input res-field" id="res-mem-limit" data-key="memory" type="text" placeholder="10G">
+          <span class="st-hint">e.g. 4G, 8192M</span>
+        </div>
+        <div class="st-field">
+          <label class="st-label">CPU Reservation</label>
+          <input class="st-input res-field" id="res-cpu-res" data-key="cpu_reservation" type="text" placeholder="0.5">
+        </div>
+        <div class="st-field">
+          <label class="st-label">Memory Reservation</label>
+          <input class="st-input res-field" id="res-mem-res" data-key="memory_reservation" type="text" placeholder="2G">
+        </div>
+      </div>
+    </div>
+
+    <div class="st-section">
+      <div class="st-section-title">GPU / OpenCL Support</div>
+      <div class="st-toggle-row">
+        <div class="st-toggle-info">
+          <span class="st-toggle-label">Enable OpenCL / NVIDIA GPU</span>
+          <span class="st-toggle-desc">Adds <code style="font-family:var(--mono);font-size:0.68rem;background:var(--card2);padding:1px 4px;border-radius:3px">runtime: nvidia</code>, deploy GPU reservation, and the <code style="font-family:var(--mono);font-size:0.68rem;background:var(--card2);padding:1px 4px;border-radius:3px">gpu.sh</code> entrypoint. Stop and restart to apply.</span>
+        </div>
+        <label class="toggle-sw"><input type="checkbox" id="res-opencl" onchange="applyOpenCL()"><span class="toggle-track"></span></label>
+      </div>
+    </div>
+    <button class="save-btn" onclick="applyResources()" style="width:100%">Apply Resources</button>
+  </div>
+
+  <!-- Properties pane -->
+  <div class="st-pane" id="st-properties">
+    <div class="st-section">
+      <div class="st-section-title">server.properties Overrides</div>
+      <p style="font-size:0.72rem;color:var(--muted);margin-bottom:14px">
+        These are written to the compose file as <code style="font-family:var(--mono);font-size:0.7rem;background:var(--card2);padding:1px 5px;border-radius:3px">OVERRIDE_OPS</code> / environment variables and take effect on restart.
+      </p>
+      <div id="props-list">
+        <!-- generated by JS -->
+      </div>
+    </div>
+    <button class="save-btn" onclick="applyProperties()" style="width:100%">Apply Properties</button>
+  </div>
+
+  <!-- Backups pane -->
+  <div class="st-pane" id="st-backup">
+    <div class="st-section">
+      <div class="st-section-title">Automatic Backups</div>
+      <p style="font-size:0.72rem;color:var(--muted);margin-bottom:14px">
+        Runs <a href="https://github.com/itzg/docker-mc-backup" target="_blank" style="color:var(--accent)">itzg/mc-backup</a>
+        as a sidecar container. Backs up world data without stopping the server.
+      </p>
+      <div class="st-toggle-row" style="margin-bottom:16px">
+        <div class="st-toggle-info">
+          <span class="st-toggle-label">Enable Backups</span>
+          <span class="st-toggle-desc">Start the mc-backup sidecar alongside this server</span>
+        </div>
+        <label class="toggle-sw"><input type="checkbox" id="bk-enabled"><span class="toggle-track"></span></label>
+      </div>
+      <div class="st-grid">
+        <div class="st-field">
+          <label class="st-label">Schedule (cron)</label>
+          <input class="st-input" id="bk-cron" type="text" value="0 */2 * * *">
+          <span class="st-hint">e.g. <code style="font-family:var(--mono);font-size:0.68rem">0 */2 * * *</code> = every 2 hours</span>
+        </div>
+        <div class="st-field">
+          <label class="st-label">Keep last N backups</label>
+          <input class="st-input" id="bk-keep" type="number" value="10" min="1" max="100">
+          <span class="st-hint">Older backups are pruned automatically</span>
+        </div>
+        <div class="st-field" style="grid-column:1/-1">
+          <label class="st-label">Backup directory (host path)</label>
+          <input class="st-input" id="bk-dir" type="text" placeholder="/path/to/backups">
+          <span class="st-hint">Where .tar.gz archives are saved on the host</span>
+        </div>
+        <div class="st-field" style="grid-column:1/-1">
+          <label class="st-label">RCON Password</label>
+          <input class="st-input" id="bk-rcon" type="text" placeholder="changeme">
+          <span class="st-hint">Must match the server's RCON_PASSWORD</span>
+        </div>
+      </div>
+    </div>
+    <button class="save-btn" onclick="applyBackup()" style="width:100%;margin-bottom:18px">Save Backup Settings</button>
+
+    <div class="st-section">
+      <div class="st-section-title" style="display:flex;align-items:center;justify-content:space-between">
+        Backup Files
+        <button class="con-btn" onclick="loadBackupFiles()" style="font-size:0.72rem">&#x21BB; Refresh</button>
+      </div>
+      <div id="bk-file-list" style="margin-top:8px;font-size:0.78rem;color:var(--muted)">
+        Load the Backups tab to see files.
+      </div>
+    </div>
+  </div>
+
+
+</div><!-- panel-settings -->
+
+        <!-- Players -->
+        <div class="tab-panel" id="panel-players">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;margin-bottom:10px">
+            <div style="font-size:0.72rem;color:var(--muted)">Online players <span id="pl-count-label" style="color:var(--text);font-family:var(--mono)">-</span></div>
+            <button class="con-btn" onclick="fetchPlayers()">Refresh</button>
+          </div>
+          <div style="flex:1;overflow-y:auto">
+            <div id="player-list-empty" style="text-align:center;padding:48px 0;color:var(--muted2);font-size:0.78rem">No players online</div>
+            <div id="player-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px"></div>
+          </div>
+        </div>
+
+        <!-- Files -->
+        <div class="tab-panel" id="panel-files">
+          <div class="breadcrumb" id="file-breadcrumb"></div>
+          <div id="file-list-wrap" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+            <div class="file-list" id="file-list"></div>
+          </div>
+          <div id="file-viewer-wrap" class="file-viewer" style="display:none">
+            <div class="file-viewer-toolbar">
+              <button class="con-btn" onclick="closeFileViewer()">&#x2190; Back</button>
+              <span class="file-viewer-name" id="viewer-filename"></span>
+              <button class="save-btn" id="viewer-save-btn" onclick="saveFile()">Save</button>
+            </div>
+            <textarea class="file-textarea" id="viewer-content" spellcheck="false"></textarea>
+          </div>
+        </div>
+
+	<!-- Mods -->
+	  <div class="tab-panel" id="panel-mods">
+  	    <div class="mod-header">
+    	    <div class="mod-count" id="mod-count">Loading mods...</div>
+    	    <div style="margin-left:auto;display:flex;gap:6px">
+      	    <button class="con-btn" id="disabled-toggle-btn" onclick="toggleDisabledView()" style="display:none">Show Disabled</button>
+      	    <button class="con-btn" onclick="fetchMods()">Refresh</button>
+    	</div>
+  	</div>
+ 	 <div class="mod-grid" id="mod-grid"></div>
+	</div>
+
+        <!-- Config -->
+        <div class="tab-panel" id="panel-config">
+          <div class="config-toolbar">
+            <span class="config-filename" id="config-filename">docker-compose.yml</span>
+            <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+              <span id="config-status" style="font-size:0.65rem;color:var(--muted)"></span>
+              <button class="save-btn" onclick="saveConfig()">Save</button>
+            </div>
+          </div>
+          <textarea class="config-textarea" id="config-content" spellcheck="false" placeholder="Loading..."></textarea>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+var API = '';
+// Safe element setter — silently ignores missing elements so applyStatus
+// never crashes the status poll even if the layout changes.
+function setEl(id, prop, val) {
+  var el = document.getElementById(id);
+  if (el) el[prop] = val;
+}
+var autoScroll = true;
+var lineCount = 0;
+var sseSource = null;
+var currentUser = null;
+var pollTimer, playerPollTimer;
+
+// Credentials — change these or extend with /api/login
+var currentServerId = null;
+var servers = [];
+var currentUserRole = 'admin';
+
+function getCookie(name) {
+  var m = document.cookie.match('(?:^|;)\s*' + name + '=([^;]*)');
+  return m ? decodeURIComponent(m[1]) : null;
+}
+function clearCookie(name) {
+  document.cookie = name + '=; max-age=0; path=/';
+}
+
+// ── Panel icon (persisted via login page picker in localStorage) ──────────
+function applyPanelIcon() {
+  try {
+    var raw  = localStorage.getItem('mcpanel_icon');
+    var pref = raw ? JSON.parse(raw) : null;
+    var url  = null;
+    if (pref && pref.mode === 'mc'  && pref.value)
+      url = 'https://crafatar.com/avatars/' + encodeURIComponent(pref.value) +
+            '?size=64&overlay&default=MHF_Steve';
+    else if (pref && pref.mode === 'url' && pref.value)
+      url = pref.value;
+    var logoEl = document.getElementById('sb-logo-icon');
+    var srvEl  = document.getElementById('srv-icon');
+    if (url && logoEl) logoEl.innerHTML =
+      '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px" ' +
+       + ' onerror="this.onerror=null;this.parentNode.textContent=String.fromCodePoint(9968)">';
+    if (url && srvEl) srvEl.innerHTML =
+      '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:7px" ' +
+       + ' onerror="this.onerror=null;this.parentNode.textContent=String.fromCodePoint(9968)">';
+  } catch(e) {}
+}
+
+window.addEventListener('load', async function() {
+  applyPanelIcon();
+  try {
+    var r = await fetch('/api/auth/me');
+    if (!r.ok) { window.location.replace('/login'); return; }
+    var data = await r.json();
+    if (!data.ok) { window.location.replace('/login'); return; }
+    currentUser = data.username;
+    currentUserRole = data.role || 'admin';
+    document.getElementById('sb-avatar').textContent = currentUser[0].toUpperCase();
+    document.getElementById('sb-uname').textContent = currentUser;
+    var roleEl = document.getElementById('sb-user-role');
+    if (roleEl) roleEl.textContent = (data.role === 'admin') ? 'Administrator' : 'Viewer';
+    applyRoleRestrictions();
+    loadServers();
+  } catch(e) { window.location.replace('/login'); }
+});
+
+function applyRoleRestrictions() {
+  if (currentUserRole !== 'viewer') {
+    // Users moved to Profile modal
+    return;
+  }
+  ['tab-files','tab-mods','tab-config','tab-settings'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  var banner = document.getElementById('viewer-banner');
+  if (banner) banner.style.display = 'flex';
+}
+
+function doLogout() {
+  currentUser = null;
+  clearCookie('mcpanel_user');
+  clearTimeout(pollTimer);
+  clearTimeout(playerPollTimer);
+  if (typeof statusAbortCtrl !== 'undefined' && statusAbortCtrl) { statusAbortCtrl.abort(); statusAbortCtrl = null; }
+  if (typeof statusFetchInFlight !== 'undefined') statusFetchInFlight = false;
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  window.location.replace('/login');
+}
+
+// ── Server list ────────────────────────────────────────────────────────────
+async function loadServers() {
+  try {
+    var res = await fetch('/api/servers');
+    servers = await res.json();
+  } catch(e) { servers = []; }
+  renderServerSidebar();
+  if (servers.length === 0) {
+    showWizard();
+  } else {
+    hideWizard();
+    selectServer(servers[0].id);
+  }
+}
+
+function renderServerSidebar() {
+  var el = document.getElementById('server-list-sidebar');
+  el.innerHTML = '';
+  servers.forEach(function(s) {
+    var item = document.createElement('div');
+    item.className = 'srv-list-item' + (s.id === currentServerId ? ' active' : '');
+    item.id = 'srv-sidebar-' + s.id;
+    item.innerHTML = '<div class="srv-list-dot" id="srv-dot-' + s.id + '"></div>' +
+      '<div class="srv-list-name">' + escHtml(s.name) + '</div>';
+    item.onclick = function() { selectServer(s.id); };
+    el.appendChild(item);
+  });
+}
+
+function selectServer(id) {
+  currentServerId = id;
+  clearTimeout(pollTimer);
+  clearTimeout(playerPollTimer);
+  // Abort any in-flight status request for the previous server so its
+  // result can't flash OFFLINE over the new server's status.
+  if (statusAbortCtrl) { statusAbortCtrl.abort(); statusAbortCtrl = null; }
+  statusFetchInFlight = false;
+  if (sseSource) { sseSource.close(); sseSource = null; }
+  tabLoaded = {};
+  settingsLoaded = false;
+  lineCount = 0;
+  document.getElementById('console').innerHTML = '';
+  document.getElementById('line-count').textContent = '0 lines';
+  document.querySelectorAll('.srv-list-item').forEach(function(el) { el.classList.remove('active'); });
+  var sideEl = document.getElementById('srv-sidebar-' + id);
+  if (sideEl) sideEl.classList.add('active');
+  var s = servers.find(function(x) { return x.id === id; });
+  if (s) {
+    document.getElementById('srv-name').textContent = s.name;
+    document.getElementById('srv-meta').textContent = 'Port ' + s.port;
+  }
+  fetchStatus();
+  startLogStream();
+  fetchPlayers();
+}
+
+// ── Server creation wizard ─────────────────────────────────────────────────
+var wizardType = 'FABRIC';
+
+function showWizard() {
+  document.getElementById('wizard-overlay').style.display = 'flex';
+  document.getElementById('wiz-mr-section').style.display = 'none';
+  var b = document.getElementById('wiz-btn');
+  b.style.display = ''; b.disabled = false; b.textContent = 'Create Server';
+  document.getElementById('wiz-err').style.display = 'none';
+  wizNewServerId = null;
+}
+function hideWizard() { document.getElementById('wizard-overlay').style.display = 'none'; }
+
+function selectType(el) {
+  document.querySelectorAll('.server-type-btn').forEach(function(b) { b.classList.remove('selected'); });
+  el.classList.add('selected');
+  wizardType = el.dataset.type;
+}
+
+async function createServer() {
+  var name = document.getElementById('wiz-name').value.trim();
+  var version = document.getElementById('wiz-version').value.trim() || 'LATEST';
+  var port = parseInt(document.getElementById('wiz-port').value) || 25565;
+  var memory = document.getElementById('wiz-memory').value.trim() || '2G';
+  var err = document.getElementById('wiz-err');
+  var btn = document.getElementById('wiz-btn');
+  if (!name) { err.textContent = 'Server name is required'; err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  try {
+    var res = await fetch('/api/servers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, server_type: wizardType, version: version, port: port, memory: memory, start_now: document.getElementById('wiz-start-now').checked, opencl_enabled: document.getElementById('wiz-opencl').checked })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed');
+    servers.push(data);
+    renderServerSidebar();
+    selectServer(data.id);
+    var startMsg = document.getElementById('wiz-start-now').checked
+      ? 'Server created and starting...'
+      : 'Server created!';
+    toast(startMsg, 'ok');
+    // Show Modrinth pre-install section
+    wizNewServerId = data.id;
+    mrSearchVersion = document.getElementById('wiz-version').value.trim() || '';
+    document.getElementById('wiz-mr-section').style.display = 'block';
+    btn.style.display = 'none';
+  } catch(e) {
+    err.textContent = e.message || 'Failed to create server';
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Create Server';
+  }
+}
+
+var wizNewServerId = null;
+
+async function wizSearchModrinth() {
+  var q = document.getElementById('wiz-mr-query').value.trim();
+  if (!q) return;
+  var el = document.getElementById('wiz-mr-results');
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:8px 0">Searching...</div>';
+  try {
+    var r = await fetch('https://api.modrinth.com/v2/search?query=' + encodeURIComponent(q) +
+      '&limit=10&facets=%5B%5B%22project_type%3Amod%22%5D%5D',
+      { headers: { 'User-Agent': 'minecraft-panel/1.0' } });
+    if (!r.ok) throw new Error('Modrinth API error');
+    var data = await r.json();
+    if (!data.hits || data.hits.length === 0) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:8px 0">No results</div>';
+      return;
+    }
+    el.innerHTML = '';
+    data.hits.forEach(function(hit) {
+      var row = document.createElement('div');
+      row.className = 'mr-result-item';
+      var iconHtml = hit.icon_url
+        ? '<img class="mr-result-icon" src="' + escHtml(hit.icon_url) + '" alt="" onerror="this.onerror=null;this.style.display=\'none\'">'
+        : '<div class="mr-result-icon-placeholder">&#x1F4E6;</div>';
+      row.innerHTML = iconHtml +
+        '<div class="mr-result-info">' +
+          '<div class="mr-result-name">' + escHtml(hit.title) + '</div>' +
+          '<div class="mr-result-desc">' + escHtml(hit.description || '') + '</div>' +
+        '</div>' +
+        '<button class="mr-install-btn" id="wiz-mr-btn-' + escHtml(hit.project_id) + '" onclick="wizInstallMod(' +
+          '\'' + escHtml(hit.project_id) + '\',' +
+          '\'' + escHtml(hit.title).replace(/'/g, "\\'") + '\'' +
+        ')">Install</button>';
+      el.appendChild(row);
+    });
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);font-size:0.78rem;padding:8px 0">Search failed</div>';
+  }
+}
+
+async function wizInstallMod(projectId, title) {
+  if (!wizNewServerId) return;
+  var btn = document.getElementById('wiz-mr-btn-' + projectId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Installing...'; }
+  try {
+    var vr = await fetch('https://api.modrinth.com/v2/project/' + projectId + '/version',
+      { headers: { 'User-Agent': 'minecraft-panel/1.0' } });
+    var versions = await vr.json();
+    var chosenFile = null;
+    for (var i = 0; i < versions.length; i++) {
+      var f = (versions[i].files || []).find(function(f) { return f.primary && f.filename.endsWith('.jar'); });
+      if (!f) f = (versions[i].files || []).find(function(f) { return f.filename.endsWith('.jar'); });
+      if (f) { chosenFile = f; break; }
+    }
+    if (!chosenFile) throw new Error('No JAR found');
+    var res = await fetch(API + '/api/servers/' + wizNewServerId + '/mods/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: chosenFile.url, filename: chosenFile.filename })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed');
+    if (btn) { btn.textContent = 'Installed ✓'; }
+    toast('Installed ' + title, 'ok');
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Install'; }
+    toast('Failed: ' + (e.message || e), 'err');
+  }
+}
+
+// Tab switching
+var tabLoaded = {};
+function goTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + name);
+  var btn = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('active');
+  if (btn) btn.classList.add('active');
+  // Lazy-load tab data
+  if (!tabLoaded[name]) {
+    tabLoaded[name] = true;
+    if (name === 'files') loadFiles('/data');
+    if (name === 'mods') {
+      fetchMods();
+      // Load current server's MC version for Modrinth version matching
+      fetch(API + '/api/servers/' + currentServerId + '/config').then(function(r){return r.json();}).then(function(cfg){
+        var m = (cfg.content||'').match(/VERSION:\s*["']?([^"'\n]+)["']?/);
+        if (m) mrSearchVersion = m[1].trim();
+      }).catch(function(){});
+    }
+    if (name === 'config') fetchConfig();
+  }
+}
+function setNav(el) {
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+// Status
+var statusFetchInFlight = false;
+var statusAbortCtrl = null;   // aborts the current in-flight status fetch
+
+async function fetchStatus() {
+  if (!currentUser) return;
+  // Don't stack concurrent fetches — if one is already running, skip and reschedule.
+  if (statusFetchInFlight) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(fetchStatus, 5000);
+    return;
+  }
+  statusFetchInFlight = true;
+  try {
+    // 10s timeout — short enough to detect issues, but the NEXT poll is always
+    // rescheduled in the finally block regardless of outcome, so the UI never freezes.
+    // 20s timeout — generous enough for proxied setups (Cloudflare, nginx)
+    // while still catching genuine backend failures.
+    statusAbortCtrl = new AbortController();
+    var timer = setTimeout(function() { statusAbortCtrl.abort(); }, 20000);
+    var res;
+    try {
+      res = await fetch(API + '/api/servers/' + currentServerId + '/status', {
+        signal: statusAbortCtrl.signal
+      });
+    } finally {
+      clearTimeout(timer);
+      statusAbortCtrl = null;
+    }
+    if (!res.ok) throw new Error('Status API error');
+    const s = await res.json();
+    applyStatus(s);
+    checkAndClearConsole(s);
+    // Fetch CPU/mem stats separately — they take ~1s from Docker and would
+    // cause the status poll to time out and falsely show OFFLINE.
+    if (s.running) fetchStats(s.container_id);
+  } catch(e) {
+    // AbortError means selectServer() cancelled this request — don't flash OFFLINE.
+    if (e && e.name !== 'AbortError') setOffline();
+  } finally {
+    statusFetchInFlight = false;
+    // Always reschedule — even on error or timeout.
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(fetchStatus, 5000);
+  }
+}
+
+async function fetchStats(containerId) {
+  if (!currentServerId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/stats', {
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) return;
+    var s = await res.json();
+    var cpu = s.cpu_percent  || 0;
+    var mu  = s.mem_usage_mb || 0;
+    var ml  = s.mem_limit_mb || 0;
+    var mp  = ml > 0 ? (mu / ml * 100) : 0;
+    document.getElementById('perf-cpu-val').textContent = cpu.toFixed(1) + '%';
+    document.getElementById('perf-mem-val').textContent = mu.toFixed(0) + ' / ' + ml.toFixed(0) + ' MB';
+    document.getElementById('ov-cpu').textContent     = cpu.toFixed(1) + '%';
+    document.getElementById('ov-memused').textContent = mu.toFixed(0) + ' MB';
+    document.getElementById('ov-memlim').textContent  = ml.toFixed(0) + ' MB';
+    document.getElementById('ov-mempct').textContent  = mp.toFixed(1) + '%';
+    setBar('perf-cpu-bar', cpu);
+    setBar('perf-mem-bar', mp);
+  } catch(e) { /* stats failure is non-fatal */ }
+}
+
+function applyStatus(s) {
+  var r = s.running;
+  document.getElementById('waveform').className = 'waveform' + (r ? ' running' : '');
+  var st = document.getElementById('status-text');
+  st.textContent = r ? 'RUNNING' : (s.status && s.status !== 'not found' ? s.status.toUpperCase() : 'OFFLINE');
+  st.className = 'stat-status-text' + (r ? ' running' : ' stopped');
+  document.getElementById('status-sub').textContent = r ? 'Server healthy and responding' : 'Server is not running';
+  var badge = document.getElementById('console-badge');
+  badge.textContent = r ? 'running' : 'offline';
+  badge.className = 'status-badge' + (r ? ' running' : ' stopped');
+  // Keep the server name the user set — don't overwrite with the container ID.
+  document.getElementById('srv-meta').textContent = r ? 'Running for ' + (s.uptime || '-') : 'Server offline';
+  document.getElementById('uptime-display').textContent = s.uptime ? 'Up ' + s.uptime : ' ';
+  // qa-dot / qa-name removed — those elements don't exist in the layout
+  document.getElementById('info-cid').textContent = s.container_id || '-';
+  document.getElementById('info-image').textContent = s.image || '-';
+  document.getElementById('info-status').textContent = (s.status || '-').toUpperCase();
+  document.getElementById('info-uptime').textContent = s.uptime || '-';
+  // Overview tab — always update so clicking the tab shows fresh data
+  document.getElementById('ov-cid').textContent    = s.container_id || '-';
+  document.getElementById('ov-image').textContent  = s.image        || '-';
+  document.getElementById('ov-status').textContent = (s.status      || '-').toUpperCase();
+  document.getElementById('ov-uptime').textContent = s.uptime       || '-';
+  // Stats (CPU/mem) are fetched separately by fetchStats() to avoid
+  // blocking the status poll. Clear them when offline.
+  if (!r) {
+    ['perf-cpu-val','perf-mem-val','ov-cpu','ov-memused','ov-memlim','ov-mempct']
+      .forEach(function(eid) { document.getElementById(eid).textContent = '-'; });
+    setBar('perf-cpu-bar', 0);
+    setBar('perf-mem-bar', 0);
+  }
+  document.getElementById('btn-start').disabled = r;
+  document.getElementById('btn-stop').disabled = !r;
+  document.getElementById('btn-restart').disabled = !r;
+  setConsoleInputEnabled(r);
+}
+
+// Auto-clear console if panel started but server isn't running
+function checkAndClearConsole(s) {
+  var isServerRunning = s.running;
+  var isPanelJustStarted = lineCount > 0 && !document.getElementById('console').dataset.serverWasRunning;
+  
+  // If server is not running and this is the first check after panel start
+  if (!isServerRunning && isPanelJustStarted) {
+    clearConsole();
+    document.getElementById('console').dataset.serverWasRunning = 'false';
+  } else if (isServerRunning) {
+    document.getElementById('console').dataset.serverWasRunning = 'true';
+  }
+}
+
+function setConsoleInputEnabled(enabled) {
+  var inp = document.getElementById('cmd-input');
+  var btn = document.querySelector('.cmd-send');
+  var msg = document.getElementById('console-offline-msg');
+  inp.disabled = !enabled;
+  inp.placeholder = enabled ? 'Enter command...' : 'Server offline';
+  if (btn) btn.disabled = !enabled;
+  if (msg) msg.className = 'console-offline-msg' + (enabled ? '' : ' visible');
+}
+
+function setOffline() {
+  document.getElementById('status-text').textContent = 'OFFLINE';
+  document.getElementById('status-text').className = 'stat-status-text stopped';
+  document.getElementById('waveform').className = 'waveform';
+  document.getElementById('status-sub').textContent = 'Server is not running';
+  document.getElementById('console-badge').textContent = 'offline';
+  document.getElementById('console-badge').className = 'status-badge stopped';
+  setConsoleInputEnabled(false);
+  // Always enable Start when offline so users can start a stopped or new server.
+  document.getElementById('btn-start').disabled   = false;
+  document.getElementById('btn-stop').disabled    = true;
+  document.getElementById('btn-restart').disabled = true;
+  document.getElementById('srv-meta').textContent = 'Server offline';
+}
+
+function setBar(id, pct) {
+  var el = document.getElementById(id);
+  el.style.width = Math.min(100, pct).toFixed(1) + '%';
+  el.className = 'perf-bar-fill' + (pct > 85 ? ' danger' : pct > 65 ? ' warn' : '');
+}
+
+// Actions
+// Delete current server
+async function deleteServer() {
+  if (!currentServerId) return;
+  var srv = servers.find(function(x) { return x.id === currentServerId; });
+  var name = srv ? srv.name : 'this server';
+  if (!confirm('Delete "' + name + '"?\n\nThis will stop the container and permanently remove all server data. This cannot be undone.')) return;
+  try {
+    var res = await fetch('/api/servers/' + currentServerId, { method: 'DELETE' });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed');
+    // Remove from local list
+    servers = servers.filter(function(x) { return x.id !== currentServerId; });
+    currentServerId = null;
+    clearTimeout(pollTimer);
+    clearTimeout(playerPollTimer);
+    if (sseSource) { sseSource.close(); sseSource = null; }
+    renderServerSidebar();
+    if (servers.length > 0) {
+      selectServer(servers[0].id);
+    } else {
+      // No servers left — show wizard
+      document.getElementById('srv-name').textContent = 'No server';
+      document.getElementById('srv-meta').textContent = '';
+      showWizard();
+    }
+    toast('Server deleted', 'ok');
+  } catch(e) {
+    toast('Delete failed: ' + (e.message || e), 'err');
+  }
+}
+
+async function action(cmd) {
+  ['btn-start','btn-stop','btn-restart'].forEach(function(id) { document.getElementById(id).disabled = true; });
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/' + cmd, { method: 'POST' });
+    var data = await res.json();
+    toast(data.message || 'Done', data.ok ? 'ok' : 'err');
+  } catch(e) { toast('Request failed', 'err'); }
+  setTimeout(fetchStatus, 1500);
+}
+
+// Console
+// replayQueue holds lines that arrive during the initial SSE burst.
+// They are flushed in one batched DOM write to avoid per-line layout thrashing.
+var replayQueue = [];
+var replayFlushing = false;
+
+function startLogStream() {
+  if (sseSource) sseSource.close();
+  var tail = document.getElementById('tail-sel').value;
+
+  // Mark that we are in the initial replay phase.
+  // The first batch of messages from the server is the persisted history —
+  // we accumulate them and flush once, then switch to live per-line mode.
+  replayQueue = [];
+  replayFlushing = true;
+
+  sseSource = new EventSource(API + '/api/servers/' + currentServerId + '/logs?tail=' + tail);
+  sseSource.onmessage = function(e) {
+    if (replayFlushing) {
+      replayQueue.push(e.data);
+      // Schedule a single flush on the next animation frame.
+      // Subsequent messages before the frame fires just append to the queue.
+      scheduleReplayFlush();
+    } else {
+      appendLog(e.data);
+    }
+  };
+  sseSource.onerror = function() {
+    sseSource.close();
+    setTimeout(function() { if (currentUser) startLogStream(); }, 5000);
+  };
+}
+
+var replayFrameScheduled = false;
+function scheduleReplayFlush() {
+  if (replayFrameScheduled) return;
+  replayFrameScheduled = true;
+  // Wait 150ms so we collect the full initial burst before flushing once.
+  setTimeout(function() {
+    replayFrameScheduled = false;
+    if (replayQueue.length === 0) { replayFlushing = false; return; }
+
+    var el = document.getElementById('console');
+    var frag = document.createDocumentFragment();
+    var lines = replayQueue.splice(0);  // take all queued lines
+
+    for (var i = 0; i < lines.length; i++) {
+      var div = makeLogDiv(lines[i]);
+      frag.appendChild(div);
+      lineCount++;
+    }
+
+    // Trim excess before inserting to avoid two reflows.
+    while (el.children.length + frag.childNodes.length > 2000) {
+      el.removeChild(el.firstChild);
+      lineCount--;
+    }
+
+    el.appendChild(frag);  // single DOM write for the entire history
+    document.getElementById('line-count').textContent = lineCount + ' lines';
+    if (autoScroll) el.scrollTop = el.scrollHeight;
+
+    replayFlushing = false;  // switch to live mode
+  }, 150);
+}
+
+function makeLogDiv(raw) {
+  var div = document.createElement('div');
+  var lo = raw.toLowerCase();
+  var cls = 'log-line';
+  if (lo.indexOf('error') !== -1 || lo.indexOf('exception') !== -1 || lo.indexOf('fatal') !== -1) cls += ' log-error';
+  else if (lo.indexOf('warn') !== -1) cls += ' log-warn';
+  else if (lo.indexOf('info') !== -1 || lo.indexOf('joined') !== -1 || lo.indexOf('left') !== -1) cls += ' log-info';
+  div.className = cls;
+  div.textContent = raw.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s/, '');
+  return div;
+}
+
+function appendLog(raw) {
+  var el = document.getElementById('console');
+  var div = makeLogDiv(raw);
+  while (el.children.length >= 2000) { el.removeChild(el.firstChild); lineCount--; }
+  el.appendChild(div);
+  lineCount++;
+  document.getElementById('line-count').textContent = lineCount + ' lines';
+  if (autoScroll) el.scrollTop = el.scrollHeight;
+}
+
+function clearConsole() {
+  document.getElementById('console').innerHTML = '';
+  lineCount = 0;
+  document.getElementById('line-count').textContent = '0 lines';
+}
+
+function toggleAutoScroll() {
+  autoScroll = !autoScroll;
+  document.getElementById('autoscroll-cb').checked = autoScroll;
+  document.getElementById('scroll-btn').textContent = 'Auto-scroll: ' + (autoScroll ? 'ON' : 'OFF');
+}
+
+document.getElementById('tail-sel').addEventListener('change', startLogStream);
+
+async function sendCommand() {
+  var input = document.getElementById('cmd-input');
+  var cmd = input.value.trim();
+  if (!cmd) return;
+  appendLog('> ' + cmd);
+  input.value = '';
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/command', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd })
+    });
+    var data = await res.json();
+    if (!data.ok) toast(data.message || 'Failed', 'err');
+    else if (data.output) appendLog(data.output);
+  } catch(e) { toast('Request failed', 'err'); }
+}
+
+// Players
+async function fetchPlayers() {
+  if (!currentUser) return;
+  try {
+    const res = await fetch(API + '/api/servers/' + currentServerId + '/players');
+    if (!res.ok) throw new Error('Players API error');
+    const data = await res.json();
+    applyPlayers(data);
+    
+    // Only keep polling if server is running
+    clearTimeout(playerPollTimer);
+    playerPollTimer = setTimeout(fetchPlayers, 10000);
+  } catch(e) {
+    // Stop polling on error
+    clearTimeout(playerPollTimer);
+  }
+}
+
+function applyPlayers(data) {
+  var count = data.count || 0;
+  var max = data.max || 20;
+  var names = data.online || [];
+  document.getElementById('perf-players').textContent = count + ' / ' + max;
+  var pips = document.getElementById('player-pips');
+  pips.innerHTML = '';
+  names.forEach(function(name) {
+    var pip = document.createElement('div');
+    pip.title = name;
+    pip.style.cssText = 'width:7px;height:7px;border-radius:50%;background:var(--green);opacity:.8';
+    pips.appendChild(pip);
+  });
+  document.getElementById('pl-count-label').textContent = count + ' / ' + max;
+  var list = document.getElementById('player-list');
+  var empty = document.getElementById('player-list-empty');
+  list.innerHTML = '';
+  if (names.length === 0) {
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    names.forEach(function(name, i) {
+      var card = document.createElement('div');
+      card.className = 'player-card';
+      card.style.animationDelay = (i * 0.04) + 's';
+      card.innerHTML = '<div class="player-avatar">' + name.slice(0,2).toUpperCase() + '</div>' +
+        '<div><div class="player-name">' + escHtml(name) + '</div><div class="player-status">online</div></div>';
+      list.appendChild(card);
+    });
+  }
+}
+
+// File browser
+var filePath = '/data';
+var viewingFilePath = '';
+
+function loadFiles(path) {
+  filePath = path;
+  document.getElementById('file-list-wrap').style.display = 'flex';
+  document.getElementById('file-viewer-wrap').style.display = 'none';
+  renderBreadcrumb(path);
+  var list = document.getElementById('file-list');
+  list.innerHTML = '<div class="file-empty">Loading...</div>';
+  fetch(API + '/api/servers/' + currentServerId + '/files?path=' + encodeURIComponent(path))
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderFileList(data); })
+    .catch(function() { list.innerHTML = '<div class="file-empty">Failed to load directory</div>'; });
+}
+
+function renderBreadcrumb(path) {
+  var bc = document.getElementById('file-breadcrumb');
+  bc.innerHTML = '';
+  var parts = path.replace(/\/+$/, '').split('/').filter(Boolean);
+  var accumulated = '';
+  var rootSpan = document.createElement('span');
+  rootSpan.className = 'breadcrumb-part';
+  rootSpan.textContent = '/';
+  rootSpan.onclick = (function() { return function() { loadFiles('/data'); }; })();
+  bc.appendChild(rootSpan);
+  parts.forEach(function(part, i) {
+    accumulated += '/' + part;
+    var sep = document.createElement('span');
+    sep.className = 'breadcrumb-sep';
+    sep.textContent = '/';
+    bc.appendChild(sep);
+    var span = document.createElement('span');
+    span.className = 'breadcrumb-part';
+    span.textContent = part;
+    var p = accumulated;
+    span.onclick = function() { loadFiles(p); };
+    bc.appendChild(span);
+  });
+}
+
+function renderFileList(data) {
+  var list = document.getElementById('file-list');
+  list.innerHTML = '';
+  if (!data.entries || data.entries.length === 0) {
+    list.innerHTML = '<div class="file-empty">Empty directory</div>';
+    return;
+  }
+  // Dirs first
+  var sorted = data.entries.slice().sort(function(a, b) {
+    if (a.is_dir === b.is_dir) return a.name.localeCompare(b.name);
+    return a.is_dir ? -1 : 1;
+  });
+  sorted.forEach(function(entry) {
+    var item = document.createElement('div');
+    item.className = 'file-item';
+    var icon = entry.is_dir ? '&#x1F4C1;' : getFileIcon(entry.name);
+    item.innerHTML = '<span class="file-icon">' + icon + '</span>' +
+      '<span class="file-name' + (entry.is_dir ? ' dir' : '') + '">' + escHtml(entry.name) + '</span>';
+    if (entry.is_dir) {
+      var p = filePath.replace(/\/+$/, '') + '/' + entry.name;
+      item.onclick = function() { loadFiles(p); };
+    } else {
+      var fp = filePath.replace(/\/+$/, '') + '/' + entry.name;
+      item.onclick = function() { openFile(fp, entry.name); };
+    }
+    list.appendChild(item);
+  });
+}
+
+function getFileIcon(name) {
+  var ext = name.split('.').pop().toLowerCase();
+  var icons = { jar:'&#x1F4E6;', json:'&#x1F4CB;', yml:'&#x1F4CB;', yaml:'&#x1F4CB;',
+    properties:'&#x2699;', txt:'&#x1F4C4;', log:'&#x1F4DC;', sh:'&#x1F4BB;', md:'&#x1F4D6;', png:'&#x1F5BC;', jpg:'&#x1F5BC;' };
+  return icons[ext] || '&#x1F4C4;';
+}
+
+function openFile(path, name) {
+  document.getElementById('viewer-filename').textContent = name;
+  viewingFilePath = path;
+  document.getElementById('viewer-content').value = 'Loading...';
+  document.getElementById('file-list-wrap').style.display = 'none';
+  document.getElementById('file-viewer-wrap').style.display = 'flex';
+  document.getElementById('viewer-save-btn').style.display = '';
+  fetch(API + '/api/servers/' + currentServerId + '/files/content?path=' + encodeURIComponent(path))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.binary) {
+        document.getElementById('viewer-content').value = '[Binary file - cannot display]';
+        document.getElementById('viewer-save-btn').style.display = 'none';
+      } else {
+        document.getElementById('viewer-content').value = data.content || '';
+      }
+    })
+    .catch(function() { document.getElementById('viewer-content').value = 'Failed to load file.'; });
+}
+
+function closeFileViewer() {
+  document.getElementById('file-list-wrap').style.display = 'flex';
+  document.getElementById('file-viewer-wrap').style.display = 'none';
+}
+
+async function saveFile() {
+  var content = document.getElementById('viewer-content').value;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/files/write', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: viewingFilePath, content: content })
+    });
+    var data = await res.json();
+    toast(data.message || 'Saved', data.ok ? 'ok' : 'err');
+  } catch(e) { toast('Save failed', 'err'); }
+}
+
+// Mods
+var showingDisabled = false;
+
+// Modrinth icon cache
+var mrIconCache = {};
+var mrSearchVersion = '';
+
+function modSlugFromFilename(filename) {
+  return filename
+    .replace(/\.jar$/i, '')
+    .replace(/[-_.][0-9]+\.[0-9]+.*/i, '')
+    .replace(/[-_](fabric|forge|neoforge|paper|spigot|quilt|bukkit).*/i, '')
+    .toLowerCase()
+    .replace(/[-_]+/g, ' ')
+    .trim();
+}
+
+async function fetchModrinthIcon(slug) {
+  if (mrIconCache[slug] !== undefined) return mrIconCache[slug];
+  mrIconCache[slug] = null;
+  try {
+    var r = await fetch('https://api.modrinth.com/v2/search?query=' + encodeURIComponent(slug) +
+      '&limit=1&facets=%5B%5B%22project_type%3Amod%22%5D%5D',
+      { headers: { 'User-Agent': 'minecraft-panel/1.0' } });
+    if (!r.ok) return null;
+    var data = await r.json();
+    if (data.hits && data.hits[0] && data.hits[0].icon_url) {
+      mrIconCache[slug] = data.hits[0].icon_url;
+    }
+  } catch(e) {}
+  return mrIconCache[slug];
+}
+
+async function searchModrinth() {
+  var q = document.getElementById('mr-query').value.trim();
+  if (!q) return;
+  var el = document.getElementById('mr-results');
+  el.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:8px 0">Searching...</div>';
+  try {
+    var r = await fetch('https://api.modrinth.com/v2/search?query=' + encodeURIComponent(q) +
+      '&limit=15&facets=%5B%5B%22project_type%3Amod%22%2C%22project_type%3Amodpack%22%5D%5D',
+      { headers: { 'User-Agent': 'minecraft-panel/1.0' } });
+    if (!r.ok) throw new Error('Modrinth API error');
+    var data = await r.json();
+    if (!data.hits || data.hits.length === 0) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:0.78rem;padding:8px 0">No results</div>';
+      return;
+    }
+    el.innerHTML = '';
+    data.hits.forEach(function(hit) {
+      var row = document.createElement('div');
+      row.className = 'mr-result-item';
+      var iconHtml = hit.icon_url
+        ? '<img class="mr-result-icon" src="' + escHtml(hit.icon_url) + '" alt="" onerror="this.onerror=null;this.style.display=\'none\'">'
+        : '<div class="mr-result-icon-placeholder">&#x1F4E6;</div>';
+      var dl = hit.downloads >= 1e6 ? (hit.downloads/1e6).toFixed(1)+'M' : hit.downloads >= 1e3 ? Math.round(hit.downloads/1e3)+'K' : hit.downloads;
+      row.innerHTML = iconHtml +
+        '<div class="mr-result-info">' +
+          '<div class="mr-result-name">' + escHtml(hit.title) + '</div>' +
+          '<div class="mr-result-desc">' + escHtml(hit.description || '') + '</div>' +
+          '<div class="mr-result-meta">' + escHtml(hit.project_type) + ' · ' + dl + ' downloads</div>' +
+        '</div>' +
+        '<button class="mr-install-btn" id="mr-btn-' + hit.project_id + '" onclick="installFromModrinth(\'' + hit.project_id + '\',\'' + escHtml(hit.title).replace(/'/g,"\\'") + '\')">Install</button>';
+      el.appendChild(row);
+    });
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);font-size:0.78rem;padding:8px 0">Search failed: ' + escHtml(e.message||'') + '</div>';
+  }
+}
+
+async function installFromModrinth(projectId, title) {
+  var btn = document.getElementById('mr-btn-' + projectId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Installing...'; }
+  try {
+    var vr = await fetch('https://api.modrinth.com/v2/project/' + projectId + '/version',
+      { headers: { 'User-Agent': 'minecraft-panel/1.0' } });
+    var versions = await vr.json();
+    var chosenFile = null;
+    for (var i = 0; i < versions.length; i++) {
+      var f = (versions[i].files||[]).find(function(f){return f.primary && f.filename.endsWith('.jar');});
+      if (!f) f = (versions[i].files||[]).find(function(f){return f.filename.endsWith('.jar');});
+      if (f) { chosenFile = f; break; }
+    }
+    if (!chosenFile) throw new Error('No JAR found');
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/mods/install', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: chosenFile.url, filename: chosenFile.filename })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed');
+    if (btn) btn.textContent = 'Installed ✓';
+    toast('Installed ' + title, 'ok');
+    fetchMods();
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Install'; }
+    toast('Failed: ' + (e.message||e), 'err');
+  }
+}
+
+async function fetchMods() {
+  document.getElementById('mod-count').textContent = 'Loading mods...';
+  document.getElementById('mod-grid').innerHTML = '';
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/mods');
+    var data = await res.json();
+    var entries = (data.entries || []).filter(function(e) { return !e.is_dir; });
+    
+    var disabledEntries = [];
+    try {
+      var disabledRes = await fetch(API + '/api/servers/' + currentServerId + '/files?path=' + encodeURIComponent('/data/mods/disabled'));
+      var disabledData = await disabledRes.json();
+      disabledEntries = (disabledData.entries || []).filter(function(e) { return !e.is_dir; });
+    } catch(e) {
+      // disabled folder doesn't exist yet
+    }
+    
+    document.getElementById('disabled-toggle-btn').style.display = disabledEntries.length > 0 ? 'block' : 'none';
+    
+    var entriesToShow = showingDisabled ? disabledEntries : entries;
+    var totalCount = entries.length;
+    var disabledCount = disabledEntries.length;
+    
+    if (showingDisabled) {
+      document.getElementById('mod-count').textContent = 'Disabled mods (' + disabledCount + ')';
+    } else {
+      document.getElementById('mod-count').textContent = totalCount + ' mod' + (totalCount !== 1 ? 's' : '') + ' installed' + (disabledCount > 0 ? ' (' + disabledCount + ' disabled)' : '');
+    }
+    
+    var grid = document.getElementById('mod-grid');
+    if (entriesToShow.length === 0) {
+      grid.innerHTML = '<div class="file-empty" style="grid-column:1/-1">No mods found</div>';
+    } else {
+      entriesToShow.forEach(function(e, i) {
+        var item = document.createElement('div');
+        item.className = 'mod-item';
+        item.style.animationDelay = (i * 0.02) + 's';
+        item.style.animation = 'fadeUp .25s ease both';
+        var modName = escHtml(e.name);
+        var modPath = (showingDisabled ? '/data/mods/disabled/' : '/data/mods/') + e.name;
+        var slug = modSlugFromFilename(e.name);
+        item.innerHTML =
+          '<div class="mod-thumb-placeholder" id="mod-icon-' + i + '">&#x1F4E6;</div>' +
+          '<div class="mod-item-info">' +
+            '<span class="mod-name" title="' + modName + '">' + modName + '</span>' +
+          '</div>' +
+          '<div class="mod-actions">' +
+          (showingDisabled ?
+            '<button class="mod-btn mod-btn-disable" onclick="enableMod(\'' + modPath.replace(/'/g, "\\'") + '\')">Enable</button>' +
+            '<button class="mod-btn mod-btn-remove" onclick="removeMod(\'' + modPath.replace(/'/g, "\\'") + '\')">Remove</button>'
+          :
+            '<button class="mod-btn mod-btn-disable" onclick="disableMod(\'' + modPath.replace(/'/g, "\\'") + '\')">Disable</button>' +
+            '<button class="mod-btn mod-btn-remove" onclick="removeMod(\'' + modPath.replace(/'/g, "\\'") + '\')">Remove</button>'
+          ) +
+          '</div>';
+        grid.appendChild(item);
+        // Async icon fetch — replace placeholder with Modrinth thumbnail
+        (function(idx, s) {
+          fetchModrinthIcon(s).then(function(url) {
+            if (!url) return;
+            var ph = document.getElementById('mod-icon-' + idx);
+            if (!ph) return;
+            var img = document.createElement('img');
+            img.className = 'mod-thumb';
+            img.src = url;
+            img.alt = '';
+            img.onerror = function() { ph.style.display = 'flex'; img.remove(); };
+            ph.replaceWith(img);
+          });
+        })(i, slug);
+      });
+    }
+  } catch(e) {
+    document.getElementById('mod-count').textContent = 'Failed to load mods';
+  }
+}
+
+function toggleDisabledView() {
+  showingDisabled = !showingDisabled;
+  document.getElementById('disabled-toggle-btn').textContent = showingDisabled ? 'Show Active' : 'Show Disabled';
+  fetchMods();
+}
+
+async function enableMod(path) {
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/mods/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: path })
+    });
+    var data = await res.json();
+    toast(data.message || 'Mod enabled', data.ok ? 'ok' : 'err');
+    if (data.ok) fetchMods();
+  } catch(e) {
+    toast('Failed to enable mod', 'err');
+  }
+}
+
+async function disableMod(path) {
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/mods/disable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: path })
+    });
+    var data = await res.json();
+    toast(data.message || 'Mod disabled', data.ok ? 'ok' : 'err');
+    if (data.ok) fetchMods();
+  } catch(e) {
+    toast('Failed to disable mod', 'err');
+  }
+}
+
+async function removeMod(path) {
+  if (!confirm('Are you sure you want to remove this mod?')) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/mods/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: path })
+    });
+    var data = await res.json();
+    toast(data.message || 'Mod removed', data.ok ? 'ok' : 'err');
+    if (data.ok) fetchMods();
+  } catch(e) {
+    toast('Failed to remove mod', 'err');
+  }
+}
+
+// Config
+// ── User management ───────────────────────────────────────────────────────
+
+async function loadUsers() {
+  var listEl = document.getElementById('prof-users-list') || document.getElementById('users-list');
+  if (!listEl) return;
+  try {
+    var r = await fetch('/api/users');
+    if (!r.ok) return;
+    var users = await r.json();
+    listEl.innerHTML = '';
+    if (users.length === 0) { listEl.innerHTML = '<div style="color:var(--muted);font-size:0.78rem">No users</div>'; return; }
+    users.forEach(function(u) {
+      var row = document.createElement('div');
+      row.className = 'user-row';
+      var isSelf = u.username === currentUser;
+      row.innerHTML =
+        '<div class="user-uname">' + escHtml(u.username) +
+          (isSelf ? ' <span style="font-size:0.6rem;color:var(--muted)">(you)</span>' : '') + '</div>' +
+        '<span class="user-role-badge ' + u.role + '">' + u.role + '</span>' +
+        (!isSelf ? '<button class="mod-btn mod-btn-remove" onclick="deleteUser(\'' + escHtml(u.username) + '\')">Remove</button>' : '');
+      listEl.appendChild(row);
+    });
+  } catch(e) {}
+}
+
+async function createUser() {
+  var name = document.getElementById('new-user-name').value.trim();
+  var pass = document.getElementById('new-user-pass').value;
+  var role = document.getElementById('new-user-role').value;
+  if (!name || !pass) { toast('Name and password required', 'err'); return; }
+  try {
+    var r = await fetch('/api/users', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: name, password: pass, role: role })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'Failed');
+    document.getElementById('new-user-name').value = '';
+    document.getElementById('new-user-pass').value = '';
+    toast('User "' + name + '" created', 'ok');
+    document.getElementById('new-user-name').value = '';
+    document.getElementById('new-user-pass').value = '';
+    loadUsers();
+  } catch(e) { toast('Error: ' + (e.message || e), 'err'); }
+}
+
+async function deleteUser(username) {
+  if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+  try {
+    var r = await fetch('/api/users/' + encodeURIComponent(username), { method: 'DELETE' });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'Failed');
+    toast('User deleted', 'ok');
+    loadUsers();
+  } catch(e) { toast('Error: ' + (e.message || e), 'err'); }
+}
+
+// ── Profile modal ────────────────────────────────────────────────────────
+
+function openProfile() {
+  var av = document.getElementById('profile-avatar');
+  var nm = document.getElementById('profile-name');
+  var rl = document.getElementById('profile-role');
+  if (av) av.textContent = (currentUser || 'A')[0].toUpperCase();
+  if (nm) nm.textContent = currentUser || '';
+  if (rl) rl.textContent = currentUserRole === 'admin' ? 'Administrator' : 'Viewer';
+  var sec = document.getElementById('prof-users-section');
+  if (sec) sec.style.display = currentUserRole === 'admin' ? '' : 'none';
+  if (currentUserRole === 'admin') loadUsers();
+  document.getElementById('profile-overlay').style.display = 'flex';
+  var np = document.getElementById('prof-pass-new');
+  var nc = document.getElementById('prof-pass-confirm');
+  if (np) np.value = '';
+  if (nc) nc.value = '';
+}
+
+function closeProfile() {
+  document.getElementById('profile-overlay').style.display = 'none';
+}
+
+async function changeOwnPassword() {
+  var np = (document.getElementById('prof-pass-new').value || '').trim();
+  var nc = (document.getElementById('prof-pass-confirm').value || '').trim();
+  if (!np) { toast('Enter a new password', 'err'); return; }
+  if (np !== nc) { toast('Passwords do not match', 'err'); return; }
+  try {
+    var r = await fetch('/api/users/' + encodeURIComponent(currentUser) + '/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: np })
+    });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.message || 'Failed');
+    toast('Password updated', 'ok');
+    document.getElementById('prof-pass-new').value = '';
+    document.getElementById('prof-pass-confirm').value = '';
+  } catch(e) { toast('Error: ' + (e.message || e), 'err'); }
+}
+
+// ── Shareable status link ─────────────────────────────────────────────────
+
+function copyShareLink() {
+  if (!currentServerId) return;
+  var url = window.location.origin + '/s/' + currentServerId;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() { toast('Status link copied!', 'ok'); });
+  } else {
+    prompt('Copy this link:', url);
+  }
+}
+
+async function fetchConfig() {
+  document.getElementById('config-content').value = 'Loading...';
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config');
+    var data = await res.json();
+    document.getElementById('config-filename').textContent = data.filename || 'docker-compose.yml';
+    document.getElementById('config-content').value = data.content || '';
+  } catch(e) {
+    document.getElementById('config-content').value = 'Could not load docker-compose file.\nMake sure it is in the same directory as the panel binary.';
+  }
+}
+
+async function saveConfig() {
+  var content = document.getElementById('config-content').value;
+  var statusEl = document.getElementById('config-status');
+  statusEl.textContent = 'Saving...';
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content })
+    });
+    var data = await res.json();
+    statusEl.textContent = data.ok ? 'Saved' : (data.message || 'Error');
+    statusEl.style.color = data.ok ? 'var(--green)' : 'var(--red)';
+    setTimeout(function() { statusEl.textContent = ''; }, 3000);
+    toast(data.message || 'Saved', data.ok ? 'ok' : 'err');
+  } catch(e) {
+    statusEl.textContent = 'Failed';
+    statusEl.style.color = 'var(--red)';
+  }
+}
+
+// Utils
+function copyAddr() {
+  navigator.clipboard.writeText(document.getElementById('conn-addr').textContent)
+    .then(function() { toast('Address copied', 'ok'); });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+var toastTimer;
+function toast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type === 'err' ? ' err' : type === 'ok' ? ' ok' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.className = ''; }, 3000);
+}
+
+// Settings — nav switching
+function goST(pane) {
+  document.querySelectorAll('.st-nav-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.st-pane').forEach(function(p) { p.classList.remove('active'); });
+  var btn = document.getElementById('stnav-' + pane);
+  var panel = document.getElementById('st-' + pane);
+  if (btn) btn.classList.add('active');
+  if (panel) panel.classList.add('active');
+  if (pane === 'properties' && !propsRendered) { renderProps(); propsRendered = true; }
+  if (pane === 'backup') loadBackupFiles();
+  if (pane === 'users') loadUsers();
+}
+
+// Parse a docker-compose YAML env value by key
+function getEnvVal(content, key) {
+  // Walk line by line — avoids complex regex escaping issues.
+  var lines = content.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (line.indexOf(key + ':') === 0) {
+      var val = line.slice(key.length + 1).trim();
+      // Strip surrounding quotes
+      val = val.replace(/^["']|["']$/g, '');
+      return val || null;
+    }
+  }
+  return null;
+}
+
+// Replace or insert an env key in docker-compose YAML content
+function setEnvVal(content, key, value) {
+  var lines = content.split('\n');
+  var found = false;
+  for (var i = 0; i < lines.length; i++) {
+    var trimmed = lines[i].trim();
+    if (trimmed.indexOf(key + ':') === 0) {
+      // Preserve the original indentation
+      var indent = lines[i].match(/^(\s*)/)[1];
+      lines[i] = indent + key + ': "' + value + '"';
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    // Key not found — insert after "environment:" line
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === 'environment:') {
+        lines.splice(i + 1, 0, '      ' + key + ': "' + value + '"');
+        break;
+      }
+    }
+  }
+  return lines.join('\n');
+}
+
+async function loadSettings() {
+  // Populate the OpenCL toggle from the server's known opencl_enabled state
+  var srv = servers.find(function(x) { return x.id === currentServerId; });
+  if (srv && document.getElementById('res-opencl')) {
+    document.getElementById('res-opencl').checked = !!srv.opencl_enabled;
+  }
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config');
+    var cfg = await res.json();
+    var c = cfg.content || '';
+
+    // Server pane
+    var v;
+    v = getEnvVal(c, 'DIFFICULTY');    if (v) document.getElementById('st-difficulty').value = v.toLowerCase();
+    v = getEnvVal(c, 'MODE');          if (v) document.getElementById('st-mode').value = v.toLowerCase();
+    v = getEnvVal(c, 'MAX_PLAYERS');   if (v) document.getElementById('st-maxplayers').value = v;
+    v = getEnvVal(c, 'LEVEL_SEED') || getEnvVal(c, 'SEED'); if (v) document.getElementById('st-seed').value = v;
+    v = getEnvVal(c, 'VIEW_DISTANCE'); if (v) document.getElementById('st-viewdist').value = v;
+    v = getEnvVal(c, 'SIMULATION_DISTANCE'); if (v) document.getElementById('st-simdist').value = v;
+    v = getEnvVal(c, 'MOTD');          if (v) document.getElementById('st-motd').value = v;
+    v = getEnvVal(c, 'TYPE');          if (v) document.getElementById('st-type').value = v.toUpperCase();
+    v = getEnvVal(c, 'VERSION');       if (v) document.getElementById('st-version').value = v;
+
+    var boolVal = function(k) {
+      var val = getEnvVal(c, k);
+      return val && (val.toLowerCase() === 'true');
+    };
+    document.getElementById('st-online-mode').checked = boolVal('ONLINE_MODE') !== false;
+    document.getElementById('st-pvp').checked       = boolVal('PVP') !== false;
+    document.getElementById('st-whitelist').checked = boolVal('ENABLE_WHITELIST') || boolVal('WHITE_LIST');
+    document.getElementById('st-flight').checked    = boolVal('ALLOW_FLIGHT');
+    document.getElementById('st-autopause').checked = boolVal('ENABLE_AUTOPAUSE');
+    document.getElementById('st-autostop').checked  = boolVal('ENABLE_AUTOSTOP');
+
+    // JVM pane
+    v = getEnvVal(c, 'INIT_MEMORY'); if (v) document.getElementById('jvm-init-mem').value = v;
+    v = getEnvVal(c, 'MAX_MEMORY');  if (v) document.getElementById('jvm-max-mem').value = v;
+    v = getEnvVal(c, 'JVM_OPTS');    if (v) document.getElementById('jvm-opts').value = v;
+    v = getEnvVal(c, 'JVM_DD_OPTS'); if (v) document.getElementById('jvm-dd-opts').value = v;
+    v = getEnvVal(c, 'EXTRA_ARGS');  if (v) document.getElementById('jvm-extra-args').value = v;
+    v = getEnvVal(c, 'TZ');          if (v) document.getElementById('jvm-tz').value = v;
+    v = getEnvVal(c, 'JAVA_TOOL_OPTIONS'); if (v) document.getElementById('jvm-tool-opts').value = v;
+    // Aikar flags: on by default unless explicitly disabled
+    var jvmXX = getEnvVal(c, 'JVM_XX_OPTS');
+    document.getElementById('jvm-aikars').checked = !jvmXX || jvmXX.indexOf('UseG1GC') !== -1;
+
+    // Resources pane
+    v = getEnvVal(c, 'cpus');               if (v) document.getElementById('res-cpu-limit').value = v;
+    v = getEnvVal(c, 'memory');             if (v) document.getElementById('res-mem-limit').value = v;
+    v = getEnvVal(c, 'cpu_reservation');    if (v) document.getElementById('res-cpu-res').value = v;
+    v = getEnvVal(c, 'memory_reservation'); if (v) document.getElementById('res-mem-res').value = v;
+
+  } catch(e) { console.warn('Could not load settings:', e); }
+}
+
+async function applyServerSettings() {
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config');
+    var cfg = await res.json();
+    var c = cfg.content || '';
+
+    var fields = {
+      DIFFICULTY:           document.getElementById('st-difficulty').value.toUpperCase(),
+      MODE:                 document.getElementById('st-mode').value.toLowerCase(),
+      MAX_PLAYERS:          document.getElementById('st-maxplayers').value,
+      LEVEL_SEED:           document.getElementById('st-seed').value,
+      VIEW_DISTANCE:        document.getElementById('st-viewdist').value,
+      SIMULATION_DISTANCE:  document.getElementById('st-simdist').value,
+      MOTD:                 document.getElementById('st-motd').value,
+      TYPE:                 document.getElementById('st-type').value,
+      VERSION:              document.getElementById('st-version').value,
+      ONLINE_MODE:          document.getElementById('st-online-mode').checked ? 'true' : 'false',
+      PVP:                  document.getElementById('st-pvp').checked ? 'true' : 'false',
+      ENABLE_WHITELIST:     document.getElementById('st-whitelist').checked ? 'true' : 'false',
+      ALLOW_FLIGHT:         document.getElementById('st-flight').checked ? 'true' : 'false',
+      ENABLE_AUTOPAUSE:     document.getElementById('st-autopause').checked ? 'true' : 'false',
+      ENABLE_AUTOSTOP:      document.getElementById('st-autostop').checked ? 'true' : 'false',
+    };
+
+    Object.keys(fields).forEach(function(key) {
+      if (fields[key] !== '' && fields[key] !== null && fields[key] !== undefined) {
+        c = setEnvVal(c, key, fields[key]);
+      }
+    });
+
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: c })
+    });
+    var data = await r.json();
+    toast(data.ok ? 'Server settings saved — restart to apply' : (data.message || 'Failed'), data.ok ? 'ok' : 'err');
+  } catch(e) { toast('Error saving settings', 'err'); }
+}
+
+async function applyJvmSettings() {
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config');
+    var cfg = await res.json();
+    var c = cfg.content || '';
+
+    var fields = {
+      INIT_MEMORY:        document.getElementById('jvm-init-mem').value.trim(),
+      MAX_MEMORY:         document.getElementById('jvm-max-mem').value.trim(),
+      JVM_OPTS:           document.getElementById('jvm-opts').value.trim(),
+      JVM_DD_OPTS:        document.getElementById('jvm-dd-opts').value.trim(),
+      EXTRA_ARGS:         document.getElementById('jvm-extra-args').value.trim(),
+      TZ:                 document.getElementById('jvm-tz').value.trim(),
+      JAVA_TOOL_OPTIONS:  document.getElementById('jvm-tool-opts').value.trim(),
+    };
+
+    // Aikar flags
+    if (!document.getElementById('jvm-aikars').checked) {
+      fields.JVM_XX_OPTS = '';
+    } else {
+      // Remove any explicit disable — let itzg apply its defaults
+      c = c.split('\n').filter(function(l) { return l.trim().indexOf('JVM_XX_OPTS:') !== 0; }).join('\n');
+    }
+
+    Object.keys(fields).forEach(function(key) {
+      if (fields[key] !== '' && fields[key] !== null && fields[key] !== undefined) {
+        c = setEnvVal(c, key, fields[key]);
+      }
+    });
+
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: c })
+    });
+    var data = await r.json();
+    toast(data.ok ? 'JVM settings saved — restart to apply' : (data.message || 'Failed'), data.ok ? 'ok' : 'err');
+  } catch(e) { toast('Error saving JVM settings', 'err'); }
+}
+
+async function applyOpenCL() {
+  var enabled = document.getElementById('res-opencl').checked;
+  try {
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/opencl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: enabled })
+    });
+    var data = await r.json();
+    toast(data.message || (data.ok ? 'OpenCL updated' : 'Failed'), data.ok ? 'ok' : 'err');
+    // Update local servers list so the toggle is correct after tab switch
+    var srv = servers.find(function(x) { return x.id === currentServerId; });
+    if (srv) srv.opencl_enabled = enabled;
+  } catch(e) { toast('Failed to update OpenCL setting', 'err'); }
+}
+
+async function applyResources() {
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config');
+    var cfg = await res.json();
+    var c = cfg.content || '';
+
+    var fields = {
+      cpus:               document.getElementById('res-cpu-limit').value.trim(),
+      memory:             document.getElementById('res-mem-limit').value.trim(),
+      cpu_reservation:    document.getElementById('res-cpu-res').value.trim(),
+      memory_reservation: document.getElementById('res-mem-res').value.trim(),
+    };
+
+    Object.keys(fields).forEach(function(key) {
+      if (fields[key]) c = setEnvVal(c, key, fields[key]);
+    });
+
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: c })
+    });
+    var data = await r.json();
+    toast(data.ok ? 'Resources saved — restart to apply' : (data.message || 'Failed'), data.ok ? 'ok' : 'err');
+  } catch(e) { toast('Error saving resources', 'err'); }
+}
+
+// ── Backup ─────────────────────────────────────────────────────────────────
+
+async function loadBackupFiles() {
+  var el = document.getElementById('bk-file-list');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--muted)">Loading...</span>';
+  try {
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/backup');
+    if (!r.ok) throw new Error('API error');
+    var data = await r.json();
+    var cfg = data.config || {};
+    // Populate config fields
+    var en = document.getElementById('bk-enabled');
+    var cr = document.getElementById('bk-cron');
+    var ke = document.getElementById('bk-keep');
+    var di = document.getElementById('bk-dir');
+    var rp = document.getElementById('bk-rcon');
+    if (en) en.checked      = !!cfg.enabled;
+    if (cr) cr.value        = cfg.cron          || '0 */2 * * *';
+    if (ke) ke.value        = cfg.keep_count    || 10;
+    if (di) { di.value      = cfg.backup_dir    || ''; di.readOnly = true; di.style.opacity = '0.6'; di.title = 'Path is managed automatically by the panel'; }
+    if (rp) rp.value        = cfg.rcon_password || 'changeme';
+    // Render file list
+    var files = data.files || [];
+    if (!files.length) {
+      el.innerHTML = '<span style="color:var(--muted);font-size:0.78rem">No backup files found yet.</span>';
+      return;
+    }
+    el.innerHTML = files.map(function(f) {
+      var mb = (f.size_bytes / 1048576).toFixed(1);
+      return '<div style="display:flex;justify-content:space-between;align-items:center;' +
+             'padding:6px 0;border-bottom:1px solid var(--border);font-size:0.78rem">' +
+        '<span style="font-family:var(--mono);word-break:break-all">' + escHtml(f.name) + '</span>' +
+        '<span style="color:var(--muted);white-space:nowrap;margin-left:12px">' +
+          mb + ' MB &nbsp;·&nbsp; ' + escHtml(f.modified) +
+        '</span>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--red);font-size:0.78rem">Failed to load backup info.</span>';
+  }
+}
+
+async function applyBackup() {
+  var cfg = {
+    enabled:       !!(document.getElementById('bk-enabled') || {}).checked,
+    cron:          (document.getElementById('bk-cron').value  || '').trim() || '0 */2 * * *',
+    keep_count:    parseInt(document.getElementById('bk-keep').value)       || 10,
+    backup_dir:    (document.getElementById('bk-dir').value   || '').trim(),
+    rcon_password: (document.getElementById('bk-rcon').value  || '').trim() || 'changeme',
+  };
+  if (!cfg.backup_dir) {
+    toast('Backup directory is required', 'err');
+    return;
+  }
+  try {
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/backup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg),
+    });
+    var data = await r.json();
+    toast(data.message || (data.ok ? 'Backup settings saved' : 'Failed'), data.ok ? 'ok' : 'err');
+    // Refresh file list after a short delay so the sidecar has time to start
+    if (data.ok) setTimeout(loadBackupFiles, 1500);
+  } catch(e) { toast('Error saving backup settings', 'err'); }
+}
+
+// server.properties override rows
+var propsRendered = false;
+var PROP_DEFS = [
+  { key: 'difficulty',                     default: 'hard' },
+  { key: 'gamemode',                       default: 'survival' },
+  { key: 'max-players',                    default: '20' },
+  { key: 'level-name',                     default: 'world' },
+  { key: 'motd',                           default: 'A Minecraft Server' },
+  { key: 'online-mode',                    default: 'true' },
+  { key: 'pvp',                            default: 'true' },
+  { key: 'allow-flight',                   default: 'false' },
+  { key: 'white-list',                     default: 'false' },
+  { key: 'enforce-whitelist',              default: 'false' },
+  { key: 'view-distance',                  default: '10' },
+  { key: 'simulation-distance',            default: '10' },
+  { key: 'spawn-protection',               default: '16' },
+  { key: 'level-seed',                     default: '' },
+  { key: 'max-tick-time',                  default: '60000' },
+  { key: 'server-port',                    default: '25565' },
+  { key: 'server-ip',                      default: '' },
+  { key: 'enable-rcon',                    default: 'true' },
+  { key: 'rcon.port',                      default: '25575' },
+  { key: 'enable-query',                   default: 'false' },
+  { key: 'query.port',                     default: '25565' },
+  { key: 'op-permission-level',            default: '4' },
+  { key: 'function-permission-level',      default: '2' },
+  { key: 'rate-limit',                     default: '0' },
+  { key: 'entity-broadcast-range-percentage', default: '100' },
+];
+
+function renderProps() {
+  var list = document.getElementById('props-list');
+  list.innerHTML = '';
+  PROP_DEFS.forEach(function(def) {
+    var row = document.createElement('div');
+    row.className = 'prop-row';
+    row.innerHTML =
+      '<span class="prop-row-key">' + escHtml(def.key) + '</span>' +
+      '<input class="prop-row-val" data-key="' + escHtml(def.key) + '" type="text" value="' + escHtml(def.default) + '">';
+    list.appendChild(row);
+  });
+}
+
+async function applyProperties() {
+  var overrides = [];
+  document.querySelectorAll('.prop-row-val').forEach(function(inp) {
+    var val = inp.value.trim();
+    if (val !== '') overrides.push(inp.dataset.key + '=' + val);
+  });
+  if (overrides.length === 0) { toast('No properties to apply', 'err'); return; }
+
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/config');
+    var cfg = await res.json();
+    var c = cfg.content || '';
+
+    // Build OVERRIDE_OPS block
+    var block = overrides.join('\n');
+    c = setEnvVal(c, 'OVERRIDE_OPS', block);
+
+    var r = await fetch(API + '/api/servers/' + currentServerId + '/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: c })
+    });
+    var data = await r.json();
+    toast(data.ok ? 'Properties saved — restart to apply' : (data.message || 'Failed'), data.ok ? 'ok' : 'err');
+  } catch(e) { toast('Error saving properties', 'err'); }
+}
+
+// Settings loaded lazily when tab opens (via window.goTab override below)
+var settingsLoaded = false;
+
+window.goTab = function(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + name);
+  var btn = document.getElementById('tab-' + name);
+  if (panel) panel.classList.add('active');
+  if (btn) btn.classList.add('active');
+
+  if (!tabLoaded[name]) {
+    tabLoaded[name] = true;
+    if (name === 'files') loadFiles('/data');
+    if (name === 'mods') {
+      fetchMods();
+      // Load current server's MC version for Modrinth version matching
+      fetch(API + '/api/servers/' + currentServerId + '/config').then(function(r){return r.json();}).then(function(cfg){
+        var m = (cfg.content||'').match(/VERSION:\s*["']?([^"'\n]+)["']?/);
+        if (m) mrSearchVersion = m[1].trim();
+      }).catch(function(){});
+    }
+    if (name === 'config') fetchConfig();
+  }
+
+  if (name === 'settings' && !settingsLoaded) {
+    settingsLoaded = true;
+    loadSettings();
+  }
+  if (name === 'config') fetchConfig();
+  // Overview always re-fetches status so the fields are fresh when you open it.
+  if (name === 'overview') fetchStatus();
+};
+
+</script>
+
+<!-- Server creation wizard -->
+<div id="wizard-overlay" class="wizard-overlay" style="display:none">
+  <div class="wizard-box">
+    <div class="wizard-title">Create a new server</div>
+    <div class="wizard-sub">Choose a server type, set a name, port and memory — we'll generate the compose file for you.</div>
+    <div class="server-types" id="wizard-types">
+      <div class="server-type-btn selected" data-type="FABRIC" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F9F5;</div>
+        <div class="server-type-name">Fabric</div>
+        <div class="server-type-desc">Mod loader</div>
+      </div>
+      <div class="server-type-btn" data-type="NEOFORGE" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F525;</div>
+        <div class="server-type-name">NeoForge</div>
+        <div class="server-type-desc">Mod loader</div>
+      </div>
+      <div class="server-type-btn" data-type="FORGE" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F528;</div>
+        <div class="server-type-name">Forge</div>
+        <div class="server-type-desc">Mod loader</div>
+      </div>
+      <div class="server-type-btn" data-type="VANILLA" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F332;</div>
+        <div class="server-type-name">Vanilla</div>
+        <div class="server-type-desc">Official</div>
+      </div>
+      <div class="server-type-btn" data-type="PAPER" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F4C4;</div>
+        <div class="server-type-name">Paper</div>
+        <div class="server-type-desc">Performance</div>
+      </div>
+      <div class="server-type-btn" data-type="PURPUR" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F7E3;</div>
+        <div class="server-type-name">Purpur</div>
+        <div class="server-type-desc">Paper fork</div>
+      </div>
+      <div class="server-type-btn" data-type="QUILT" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F9F6;</div>
+        <div class="server-type-name">Quilt</div>
+        <div class="server-type-desc">Fabric fork</div>
+      </div>
+      <div class="server-type-btn" data-type="SPIGOT" onclick="selectType(this)">
+        <div class="server-type-icon">&#x1F4A7;</div>
+        <div class="server-type-name">Spigot</div>
+        <div class="server-type-desc">Plugin server</div>
+      </div>
+    </div>
+    <div class="wizard-fields">
+      <div class="wizard-field" style="grid-column:1/-1">
+        <label class="wizard-label">Server Name</label>
+        <input class="wizard-input" id="wiz-name" type="text" placeholder="My Minecraft Server">
+      </div>
+      <div class="wizard-field">
+        <label class="wizard-label">Version</label>
+        <input class="wizard-input" id="wiz-version" type="text" placeholder="LATEST" value="LATEST">
+      </div>
+      <div class="wizard-field">
+        <label class="wizard-label">Port</label>
+        <input class="wizard-input" id="wiz-port" type="number" placeholder="25565" value="25565">
+      </div>
+      <div class="wizard-field">
+        <label class="wizard-label">Memory</label>
+        <input class="wizard-input" id="wiz-memory" type="text" placeholder="2G" value="2G">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;margin-top:6px">
+      <label class="toggle-sw" style="flex-shrink:0">
+        <input type="checkbox" id="wiz-opencl">
+        <span class="toggle-track"></span>
+      </label>
+      <div>
+        <div style="font-size:0.8rem;font-weight:500">OpenCL / GPU support (NVIDIA)</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:1px">Adds <code style="font-family:var(--mono);font-size:0.7rem;background:var(--card2);padding:1px 4px;border-radius:3px">runtime: nvidia</code> + gpu.sh entrypoint for OpenCL workloads</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <label class="toggle-sw" style="flex-shrink:0">
+        <input type="checkbox" id="wiz-start-now" checked>
+        <span class="toggle-track"></span>
+      </label>
+      <div>
+        <div style="font-size:0.8rem;font-weight:500">Start server after creation</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:1px">Runs <code style="font-family:var(--mono);font-size:0.7rem;background:var(--card2);padding:1px 4px;border-radius:3px">docker compose up -d</code> immediately</div>
+      </div>
+    </div>
+    <button class="wizard-create-btn" id="wiz-btn" onclick="createServer()">Create Server</button>
+    <div id="wiz-err" class="wizard-err">Failed to create server. Check the panel logs.</div>
+
+    <!-- Modrinth pre-install section — shown after server is created -->
+    <div id="wiz-mr-section" style="display:none;margin-top:18px;border-top:1px solid var(--border);padding-top:16px">
+      <div style="font-size:0.85rem;font-weight:600;margin-bottom:4px">Install mods (optional)</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px">Search Modrinth and install mods before starting your server.</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input class="wizard-input" id="wiz-mr-query" type="text" placeholder="Search Modrinth..." style="flex:1" onkeydown="if(event.key==='Enter')wizSearchModrinth()">
+        <button class="con-btn" onclick="wizSearchModrinth()">Search</button>
+      </div>
+      <div id="wiz-mr-results" style="max-height:220px;overflow-y:auto"></div>
+      <button class="wizard-create-btn" style="margin-top:14px;background:var(--green)" onclick="hideWizard()">Done</button>
+    </div>
+  </div>
+</div>
+<!-- Profile & User Management Modal -->
+<div id="profile-overlay" class="profile-overlay" style="display:none" onclick="if(event.target===this)closeProfile()">
+  <div class="profile-box">
+    <div class="profile-header">
+      <div class="profile-avatar" id="profile-avatar">A</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.95rem;font-weight:600" id="profile-name">Admin</div>
+        <div style="font-size:0.72rem;color:var(--muted)" id="profile-role">Admin</div>
+      </div>
+      <button class="mod-btn" onclick="closeProfile()" style="padding:5px 10px;font-size:0.75rem">&#x2715;</button>
+    </div>
+    <div class="profile-body">
+      <div class="profile-section">
+        <div class="profile-section-title">Change Password</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <input class="st-input" id="prof-pass-new" type="password" placeholder="New password" style="width:100%">
+          <input class="st-input" id="prof-pass-confirm" type="password" placeholder="Confirm new password" style="width:100%">
+          <button class="save-btn" onclick="changeOwnPassword()" style="width:100%">Update Password</button>
+        </div>
+      </div>
+      <div class="profile-section" id="prof-users-section" style="display:none">
+        <div class="profile-section-title">User Accounts</div>
+        <div id="prof-users-list" style="margin-bottom:14px"></div>
+        <div style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:14px">
+          <div style="font-size:0.78rem;font-weight:500;margin-bottom:10px">Add User</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div>
+              <label class="st-label">Username</label>
+              <input class="st-input" id="new-user-name" type="text" placeholder="username" style="width:100%;margin-top:4px">
+            </div>
+            <div>
+              <label class="st-label">Password</label>
+              <input class="st-input" id="new-user-pass" type="password" placeholder="password" style="width:100%;margin-top:4px">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label class="st-label">Role</label>
+            <select class="st-select" id="new-user-role" style="width:100%;margin-top:4px">
+              <option value="viewer">Viewer &#8212; status &amp; controls only</option>
+              <option value="admin">Admin &#8212; full access</option>
+            </select>
+          </div>
+          <button class="save-btn" onclick="createUser()" style="width:100%">Add User</button>
+        </div>
+      </div>
+      <button onclick="doLogout()" style="width:100%;background:transparent;border:1px solid var(--border2);border-radius:6px;padding:9px;font-family:var(--font);font-size:0.82rem;color:var(--muted);cursor:pointer">Sign out</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
