@@ -61,7 +61,6 @@ where
 static INDEX_HTML:     &str = include_str!("../static/index.html");
 static LOGIN_HTML:     &str = include_str!("../static/login.html");
 static VIEWER_HTML:    &str = include_str!("../static/viewer.html");
-static DASHBOARD_HTML: &str = include_str!("../static/dashboard.html");
 static MOBILE_HTML:    &str = include_str!("../static/mobile.html");
 static SETUP_HTML:     &str = include_str!("../static/setup.html");
 
