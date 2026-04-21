@@ -242,21 +242,33 @@ body {
 /* ── Players ── */
 .player-grid {
   padding: 12px; display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 7px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 7px;
 }
 .player-card {
   background: var(--card2); border: 1px solid var(--border2);
-  border-radius: 6px; padding: 9px 10px;
-  display: flex; align-items: center; gap: 8px;
+  border-radius: 8px; padding: 9px 10px;
+  display: flex; align-items: center; gap: 9px;
+  transition: border-color .15s;
 }
 .player-av {
-  width: 26px; height: 26px; border-radius: 4px;
+  width: 34px; height: 34px; border-radius: 5px;
   background: var(--card3); border: 1px solid var(--border2);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.6rem; color: var(--muted); font-family: var(--mono); flex-shrink: 0;
+  font-size: 0.6rem; color: var(--muted); font-family: var(--mono);
+  flex-shrink: 0; overflow: hidden;
 }
-.player-name-text { font-size: 0.73rem; font-family: var(--mono); }
-.player-status-text { font-size: 0.56rem; color: var(--green); margin-top: 1px; }
+.player-av canvas {
+  width: 34px; height: 34px; display: block;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+.player-name-text { font-size: 0.72rem; font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-status-text { font-size: 0.54rem; color: var(--green); margin-top: 1px; }
+.player-type-badge {
+  font-size: 0.5rem; font-weight: 600; padding: 1px 4px;
+  border-radius: 3px; letter-spacing: .04em; margin-top: 2px; display: inline-block;
+}
+.player-type-badge.bedrock { background: rgba(106,171,207,.1); color: var(--blue); border: 1px solid rgba(106,171,207,.2); }
+.player-type-badge.java { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
 .no-players { padding: 28px 14px; text-align: center; color: var(--muted2); font-size: 0.75rem; }
 
 /* ── Dashboard server list items ── */
@@ -539,7 +551,7 @@ window.addEventListener('load', async function() {
     try {
       var raw = localStorage.getItem('mcpanel_icon'), pref = raw ? JSON.parse(raw) : null, url = null;
       if (pref && pref.mode === 'mc' && pref.value)
-        url = 'https://crafatar.com/avatars/' + encodeURIComponent(pref.value) + '?size=64&overlay&default=MHF_Steve';
+        url = 'https://minotar.net/helm/' + encodeURIComponent(pref.value) + '/64.png';
       else if (pref && pref.mode === 'url' && pref.value) url = pref.value;
       if (url) document.getElementById('tb-icon').innerHTML =
         '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror="this.parentNode.textContent=\'⛰\'">';
@@ -690,15 +702,103 @@ async function pollPlayers() {
     if (!data.online || !data.online.length) {
       grid.innerHTML = '<div class="no-players">No players online</div>';
     } else {
-      grid.innerHTML = data.online.map(function(name) {
-        return '<div class="player-card">' +
-          '<div class="player-av">' + esc(name.slice(0,2).toUpperCase()) + '</div>' +
-          '<div><div class="player-name-text">' + esc(name) + '</div><div class="player-status-text">online</div></div>' +
-        '</div>';
-      }).join('');
+      grid.innerHTML = '';
+      data.online.forEach(function(name) {
+        var isBedrock = name.charAt(0) === '.';
+        var displayName = isBedrock ? name.slice(1) : name;
+        var card = document.createElement('div');
+        card.className = 'player-card';
+        var av = document.createElement('div');
+        av.className = 'player-av';
+        av.textContent = displayName.slice(0,2).toUpperCase();
+        var info = document.createElement('div');
+        info.style.cssText = 'min-width:0;flex:1;overflow:hidden';
+        info.innerHTML =
+          '<div class="player-name-text" title="' + esc(name) + '">' + esc(name) + '</div>' +
+          '<div class="player-status-text">online</div>' +
+          '<span class="player-type-badge ' + (isBedrock ? 'bedrock' : 'java') + '">' +
+          (isBedrock ? 'Bedrock' : 'Java') + '</span>';
+        card.appendChild(av);
+        card.appendChild(info);
+        grid.appendChild(card);
+        if (isBedrock) {
+          loadBedrockHead(displayName, av);
+        } else {
+          loadJavaHead(displayName, av);
+        }
+      });
     }
   } catch(e) {}
   playerTimer = setTimeout(pollPlayers, 12000);
+}
+
+// ── Java head via Crafatar ────────────────────────────────────────────────
+function loadJavaHead(username, avEl) {
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    avEl.textContent = '';
+    avEl.style.padding = '0';
+    var canvas = document.createElement('canvas');
+    canvas.width = 34; canvas.height = 34;
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, 34, 34);
+    avEl.appendChild(canvas);
+  };
+  img.src = 'https://minotar.net/helm/' + encodeURIComponent(username) + '/34.png';
+}
+
+// ── Bedrock head via GeyserMC API chain ───────────────────────────────────
+var bedrockHeadCache = {};
+
+async function loadBedrockHead(xboxName, avEl) {
+  try {
+    if (bedrockHeadCache[xboxName]) { renderSkinHead(bedrockHeadCache[xboxName], avEl, 34); return; }
+    var xuidRes = await fetch('https://api.geysermc.org/v2/xbox/xuid/' + encodeURIComponent(xboxName));
+    if (!xuidRes.ok) throw new Error('XUID fail');
+    var xuidData = await xuidRes.json();
+    if (!xuidData.xuid) throw new Error('No XUID');
+    var skinRes = await fetch('https://api.geysermc.org/v2/skin/' + xuidData.xuid);
+    if (!skinRes.ok) throw new Error('Skin fail');
+    var skinData = await skinRes.json();
+    if (!skinData.texture_id) throw new Error('No texture_id');
+    var textureUrl = 'https://textures.minecraft.net/texture/' + skinData.texture_id;
+    bedrockHeadCache[xboxName] = textureUrl;
+    renderSkinHead(textureUrl, avEl, 34);
+  } catch(e) {}
+}
+
+function renderSkinHead(textureUrl, avEl, size) {
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    try {
+      var sw = img.naturalWidth, scale = sw / 64;
+      var faceX = 8*scale, faceY = 8*scale, faceW = 8*scale, faceH = 8*scale;
+      var hatX  = 40*scale, hatY = 8*scale, hatW = 8*scale, hatH = 8*scale;
+      var canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, faceX, faceY, faceW, faceH, 0, 0, size, size);
+      var sh = img.naturalHeight;
+      if (sh >= 32 * scale) {
+        var test = document.createElement('canvas');
+        test.width = hatW; test.height = hatH;
+        var tctx = test.getContext('2d');
+        tctx.drawImage(img, hatX, hatY, hatW, hatH, 0, 0, hatW, hatH);
+        var px = tctx.getImageData(0, 0, hatW, hatH).data;
+        var hasHat = false;
+        for (var i = 3; i < px.length; i += 4) { if (px[i] > 10) { hasHat = true; break; } }
+        if (hasHat) ctx.drawImage(img, hatX, hatY, hatW, hatH, 0, 0, size, size);
+      }
+      avEl.textContent = '';
+      avEl.style.padding = '0';
+      avEl.appendChild(canvas);
+    } catch(e) {}
+  };
+  img.src = textureUrl;
 }
 
 // ── Console SSE ────────────────────────────────────────────────────────────

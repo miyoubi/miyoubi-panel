@@ -30,9 +30,16 @@ body{display:flex;flex-direction:column;align-items:center;justify-content:cente
 .stat-label{font-size:0.62rem;font-weight:500;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
 .stat-val{font-family:var(--mono);font-size:0.95rem;font-weight:500}
 .player-box{background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:12px 14px}
-.player-label{font-size:0.62rem;font-weight:500;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
-.player-list{display:flex;flex-wrap:wrap;gap:6px}
-.player-chip{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-size:0.72rem;font-family:var(--mono)}
+.player-label{font-size:0.62rem;font-weight:500;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+.player-list{display:flex;flex-wrap:wrap;gap:8px}
+.player-card{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px 9px}
+.player-av{width:28px;height:28px;border-radius:4px;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:var(--muted);font-family:var(--mono);flex-shrink:0;overflow:hidden}
+.player-av canvas{width:28px;height:28px;display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+.player-info{display:flex;flex-direction:column;gap:1px}
+.player-chip{font-size:0.73rem;font-family:var(--mono)}
+.player-type{font-size:0.52rem;font-weight:600;padding:1px 4px;border-radius:3px;letter-spacing:.04em}
+.player-type.bedrock{background:rgba(106,171,207,.1);color:#6aabcf;border:1px solid rgba(106,171,207,.2)}
+.player-type.java{background:rgba(34,197,94,.1);color:#22c55e;border:1px solid rgba(34,197,94,.2)}
 .player-none{font-size:0.72rem;color:var(--muted2)}
 .footer{font-size:0.62rem;color:var(--muted2);margin-top:18px;text-align:center}
 .perf-bar-track{height:4px;background:var(--border2);border-radius:2px;margin-top:6px}
@@ -140,10 +147,27 @@ async function refresh() {
         listEl.innerHTML = '';
         if (p.online && p.online.length > 0) {
           p.online.forEach(function(name) {
-            var chip = document.createElement('span');
-            chip.className = 'player-chip';
-            chip.textContent = name;
-            listEl.appendChild(chip);
+            var isBedrock = name.charAt(0) === '.';
+            var displayName = isBedrock ? name.slice(1) : name;
+            var card = document.createElement('div');
+            card.className = 'player-card';
+            var av = document.createElement('div');
+            av.className = 'player-av';
+            av.textContent = displayName.slice(0,2).toUpperCase();
+            var info = document.createElement('div');
+            info.className = 'player-info';
+            info.innerHTML =
+              '<span class="player-chip">' + escHtml(name) + '</span>' +
+              '<span class="player-type ' + (isBedrock ? 'bedrock' : 'java') + '">' +
+              (isBedrock ? 'Bedrock' : 'Java') + '</span>';
+            card.appendChild(av);
+            card.appendChild(info);
+            listEl.appendChild(card);
+            if (isBedrock) {
+              loadBedrockHead(displayName, av);
+            } else {
+              loadJavaHead(displayName, av);
+            }
           });
         } else {
           listEl.innerHTML = '<span class="player-none">No players online</span>';
@@ -176,6 +200,77 @@ function setBar(id, pct) {
 
 refresh();
 setInterval(refresh, 10000);
+
+// ── Head rendering ────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function loadJavaHead(username, avEl) {
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    avEl.textContent = '';
+    avEl.style.padding = '0';
+    var canvas = document.createElement('canvas');
+    canvas.width = 28; canvas.height = 28;
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, 28, 28);
+    avEl.appendChild(canvas);
+  };
+  img.src = 'https://minotar.net/helm/' + encodeURIComponent(username) + '/28.png';
+}
+
+var bedrockHeadCache = {};
+
+async function loadBedrockHead(xboxName, avEl) {
+  try {
+    if (bedrockHeadCache[xboxName]) { renderSkinHead(bedrockHeadCache[xboxName], avEl, 28); return; }
+    var xuidRes = await fetch('https://api.geysermc.org/v2/xbox/xuid/' + encodeURIComponent(xboxName));
+    if (!xuidRes.ok) throw new Error();
+    var xuidData = await xuidRes.json();
+    if (!xuidData.xuid) throw new Error();
+    var skinRes = await fetch('https://api.geysermc.org/v2/skin/' + xuidData.xuid);
+    if (!skinRes.ok) throw new Error();
+    var skinData = await skinRes.json();
+    if (!skinData.texture_id) throw new Error();
+    var textureUrl = 'https://textures.minecraft.net/texture/' + skinData.texture_id;
+    bedrockHeadCache[xboxName] = textureUrl;
+    renderSkinHead(textureUrl, avEl, 28);
+  } catch(e) {}
+}
+
+function renderSkinHead(textureUrl, avEl, size) {
+  var img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    try {
+      var sw = img.naturalWidth, scale = sw / 64;
+      var faceX = 8*scale, faceY = 8*scale, faceW = 8*scale, faceH = 8*scale;
+      var hatX  = 40*scale, hatY = 8*scale, hatW = 8*scale, hatH = 8*scale;
+      var canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, faceX, faceY, faceW, faceH, 0, 0, size, size);
+      var sh = img.naturalHeight;
+      if (sh >= 32 * scale) {
+        var test = document.createElement('canvas'); test.width = hatW; test.height = hatH;
+        var tctx = test.getContext('2d');
+        tctx.drawImage(img, hatX, hatY, hatW, hatH, 0, 0, hatW, hatH);
+        var px = tctx.getImageData(0, 0, hatW, hatH).data;
+        var hasHat = false;
+        for (var i = 3; i < px.length; i += 4) { if (px[i] > 10) { hasHat = true; break; } }
+        if (hasHat) ctx.drawImage(img, hatX, hatY, hatW, hatH, 0, 0, size, size);
+      }
+      avEl.textContent = '';
+      avEl.style.padding = '0';
+      avEl.appendChild(canvas);
+    } catch(e) {}
+  };
+  img.src = textureUrl;
+}
 </script>
 </body>
 </html>
