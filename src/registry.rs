@@ -51,19 +51,21 @@ pub struct ServerInstance {
 // ── Registry ──────────────────────────────────────────────────────────────
 
 pub struct ServerRegistry {
-    servers: RwLock<HashMap<String, Arc<ServerInstance>>>,
+    servers:    RwLock<HashMap<String, Arc<ServerInstance>>>,
     config_dir: PathBuf,
+    db:         crate::db::Db,
 }
 
 impl ServerRegistry {
-    pub fn load(config_dir: impl Into<PathBuf>) -> Result<Arc<Self>> {
+    pub fn load(config_dir: impl Into<PathBuf>, db: crate::db::Db) -> Result<Arc<Self>> {
         let config_dir = config_dir.into();
         let servers_dir = config_dir.join("servers");
         fs::create_dir_all(&servers_dir).context("creating servers dir")?;
 
         let reg = Arc::new(Self {
-            servers: RwLock::new(HashMap::new()),
+            servers:    RwLock::new(HashMap::new()),
             config_dir,
+            db:         db.clone(),
         });
 
         for entry in fs::read_dir(&servers_dir).context("reading servers dir")? {
@@ -89,7 +91,7 @@ impl ServerRegistry {
             // make them absolute relative to the servers directory so they work
             // regardless of where the binary is launched from.
             let def = fix_paths(def, &servers_dir);
-            match Self::build_instance(def) {
+            match Self::build_instance(def, reg.db.clone()) {
                 Ok(inst) => {
                     let inst = Arc::new(inst);
                     reg.servers.write().unwrap().insert(id.clone(), inst.clone());
@@ -102,20 +104,13 @@ impl ServerRegistry {
         Ok(reg)
     }
 
-    fn build_instance(def: ServerDef) -> Result<ServerInstance> {
+    fn build_instance(def: ServerDef, db: crate::db::Db) -> Result<ServerInstance> {
         let docker = Arc::new(
             DockerClient::new(def.container_name.clone())
                 .context("connecting to Docker")?,
         );
-        let lb = Arc::new(LogBuffer::new());
-        // console.log lives next to docker-compose.yml (absolute path)
-        let log_path = Path::new(&def.compose_file)
-            .parent()
-            .unwrap()
-            .join("console.log");
-        if let Err(e) = lb.load_from_file(log_path.to_str().unwrap()) {
-            tracing::warn!("Could not load console log for {}: {}", def.id, e);
-        }
+        // LogBuffer loads history from the DB automatically.
+        let lb = Arc::new(LogBuffer::new(def.id.clone(), db));
         Ok(ServerInstance { def, docker, log_buffer: lb })
     }
 
@@ -128,8 +123,12 @@ impl ServerRegistry {
         loop {
             match inst.docker.stream_logs_to_buffer(&inst.log_buffer, tail).await {
                 Ok(()) => {
-                    // Container stopped cleanly — replay history on reconnect.
-                    tail = "500";
+                    // Container stopped cleanly — keep logs in DB (user can
+                    // read them while offline). When the server starts again,
+                    // the start/restart handler calls clear() before pump_logs
+                    // reconnects, so we use tail="0" here to avoid re-delivering
+                    // the previous session's lines.
+                    tail = "0";
                     tokio::time::sleep(Duration::from_secs(2)).await;
                 }
                 Err(e) => {
@@ -175,7 +174,9 @@ impl ServerRegistry {
                             "[{}] Log stream reset (container restart?), retrying",
                             inst.def.name
                         );
-                        tail = "500";
+                        // The restart handler calls clear() before we get here,
+                        // so tail="0" avoids re-streaming cleared history.
+                        tail = "0";
                         tokio::time::sleep(Duration::from_secs(2)).await;
                         continue;
                     } else {
@@ -183,7 +184,9 @@ impl ServerRegistry {
                             "[{}] Log stream error: {} — retrying in 5s",
                             inst.def.name, e
                         );
-                        tail = "500";
+                        // Don't replay — if start/restart cleared the buffer,
+                        // replaying would bring stale lines back.
+                        tail = "0";
                     }
                 }
             }
@@ -255,7 +258,7 @@ impl ServerRegistry {
         let compose = generate_compose(&def, &req);
         fs::write(&compose_path, &compose).context("writing docker-compose.yml")?;
 
-        let inst = Arc::new(Self::build_instance(def.clone())?);
+        let inst = Arc::new(Self::build_instance(def.clone(), self.db.clone())?);
         self.servers.write().unwrap().insert(id.clone(), inst.clone());
         tokio::spawn(Self::pump_logs(inst));
 
@@ -276,7 +279,6 @@ impl ServerRegistry {
             .parent()
             .map(PathBuf::from);
 
-        inst.log_buffer.close();
         drop(inst);
 
         if let Some(d) = dir {

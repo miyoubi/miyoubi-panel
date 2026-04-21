@@ -1,204 +1,129 @@
+//! Per-server console log buffer.
+//!
+//! Lines are held in a `VecDeque` in memory for fast SSE streaming and
+//! also persisted to the SQLite database (`console_log` table) so history
+//! survives restarts. Pressing "Clear" in the UI calls `clear()` which
+//! wipes both the in-memory buffer and the database rows — no stale history
+//! leaks back on the next page load.
+//!
+//! Storage is compact: only `kind` (short tag) and `text` are stored;
+//! timestamps are Unix-millisecond integers rather than formatted strings.
+//! Duplicate lines within a 2-second window are dropped.
+
 use std::collections::VecDeque;
-use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
-const MAX_LINES: usize = 2000;
+pub const MAX_LINES: usize = 2000;
 const DEDUP_WINDOW: Duration = Duration::from_secs(2);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// ── Types ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LogLine {
     pub text: String,
     pub kind: String,
 }
 
+// ── Buffer ────────────────────────────────────────────────────────────────
+
 struct Inner {
     buf: VecDeque<(Instant, LogLine)>,
-    log_file: Option<File>,
 }
 
 pub struct LogBuffer {
-    inner: Mutex<Inner>,
-    tx: broadcast::Sender<LogLine>,
+    server_id: String,
+    db:        crate::db::Db,
+    inner:     Mutex<Inner>,
+    tx:        broadcast::Sender<LogLine>,
 }
 
 impl LogBuffer {
-    pub fn new() -> Self {
+    /// Create a new buffer for `server_id`, loading existing history from the DB.
+    pub fn new(server_id: impl Into<String>, db: crate::db::Db) -> Self {
+        let server_id = server_id.into();
         let (tx, _) = broadcast::channel(1024);
+
+        // Load persisted history.
+        let history = db.log_load(&server_id, MAX_LINES).unwrap_or_default();
+        let now = Instant::now();
+        let buf = history.into_iter()
+            .map(|l| (now, l))
+            .collect::<VecDeque<_>>();
+
         Self {
-            inner: Mutex::new(Inner {
-                buf: VecDeque::new(),
-                log_file: None,
-            }),
+            server_id,
+            db,
+            inner: Mutex::new(Inner { buf }),
             tx,
         }
     }
 
-    /// Read existing lines from `path` into the buffer, then keep the file
-    /// open for future appends. File format: `kind\ttext\n` per line.
-    pub fn load_from_file(&self, path: &str) -> Result<()> {
-        // Read history first.
-        let rf = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(path)
-            .with_context(|| format!("opening log file {}", path))?;
-
-        let mut lines: Vec<(Instant, LogLine)> = Vec::new();
-        for raw in BufReader::new(&rf).lines() {
-            let raw = raw?;
-            if raw.is_empty() {
-                continue;
-            }
-            if let Some(tab) = raw.find('\t') {
-                let text = raw[tab + 1..]
-                    .chars()
-                    .filter(|&c| c == '\t' || (c as u32 >= 0x20 && c as u32 != 0x7F))
-                    .collect::<String>();
-                let text = text.trim().to_string();
-                if text.is_empty() { continue; }
-                lines.push((
-                    Instant::now(),
-                    LogLine {
-                        kind: raw[..tab].to_string(),
-                        text,
-                    },
-                ));
-            }
-        }
-        drop(rf);
-
-        // Trim to max.
-        if lines.len() > MAX_LINES {
-            lines.drain(0..lines.len() - MAX_LINES);
-        }
-
-        // If file is over-full, rewrite trimmed version.
-        let needs_rewrite = lines.len() == MAX_LINES;
-
-        {
-            let mut inner = self.inner.lock().unwrap();
-            inner.buf = lines.into_iter().collect();
-        }
-
-        if needs_rewrite {
-            self.rewrite_file(path);
-        }
-
-        // Re-open for appending.
-        let wf = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(path)
-            .with_context(|| format!("opening log file for append: {}", path))?;
-
-        self.inner.lock().unwrap().log_file = Some(wf);
-        Ok(())
-    }
-
-    fn rewrite_file(&self, path: &str) {
-        let inner = self.inner.lock().unwrap();
-        if let Ok(mut f) = OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(true)
-            .open(path)
-        {
-            for (_, line) in &inner.buf {
-                let _ = writeln!(f, "{}\t{}", line.kind, line.text);
-            }
-        }
-    }
-
-    /// Push a line into the buffer, persist it, and broadcast to all subscribers.
-    /// Lines with identical text within the dedup window are silently dropped —
-    /// this prevents double-delivery when rcon output also appears in Docker logs.
+    /// Push a line: sanitise → dedup → store in memory + DB → broadcast.
     pub fn push(&self, text: String, kind: &str) {
-        // ── Sanitize ─────────────────────────────────────────────────────
-        // Docker attach (and apt-get progress output) can produce lines with
-        // embedded bare \r (carriage return without \n). These are used by
-        // terminals to overwrite the current line. Split on \r and take the
-        // last non-empty segment — that's the final state of the line.
-        // Then strip any remaining ASCII control characters (except tab).
-        // This prevents the axum SSE panic:
-        //   "SSE field value cannot contain newlines or carriage returns"
+        // Sanitise: split on bare \r, keep last non-empty segment,
+        // strip non-printable control chars (keep tab).
         let text = {
             let last = text.split('\r')
                 .filter(|s| !s.trim().is_empty())
                 .last()
                 .unwrap_or(&text)
                 .to_string();
-            // Strip non-printable control chars (keep tab=0x09, keep >=0x20)
             last.chars()
                 .filter(|&c| c == '\t' || (c as u32 >= 0x20 && c as u32 != 0x7F))
                 .collect::<String>()
         };
         let text = text.trim().to_string();
-        if text.is_empty() {
-            return;
-        }
+        if text.is_empty() { return; }
 
         let now = Instant::now();
-
-        let line = LogLine {
-            text: text.clone(),
-            kind: kind.to_string(),
-        };
+        let line = LogLine { text: text.clone(), kind: kind.to_string() };
 
         {
             let mut inner = self.inner.lock().unwrap();
 
-            // Dedup check: scan recent entries backwards.
+            // Dedup: drop if identical text seen within the window.
             let is_dup = inner.buf.iter().rev().any(|(t, l)| {
                 now.duration_since(*t) < DEDUP_WINDOW && l.text == text
             });
-            if is_dup {
-                return;
-            }
+            if is_dup { return; }
 
             if inner.buf.len() >= MAX_LINES {
                 inner.buf.pop_front();
             }
             inner.buf.push_back((now, line.clone()));
-
-            if let Some(ref mut f) = inner.log_file {
-                let _ = writeln!(f, "{}\t{}", kind, text);
-            }
         }
 
-        // Broadcast outside the lock — slow subscribers just get RecvError::Lagged.
+        // Persist outside the lock so the DB write doesn't block broadcasts.
+        if let Err(e) = self.db.log_append(&self.server_id, kind, &text) {
+            tracing::warn!("log_append failed for {}: {}", self.server_id, e);
+        }
+
         let _ = self.tx.send(line);
     }
 
-    /// Return a point-in-time snapshot of all buffered lines.
+    /// Snapshot of all in-memory lines (oldest first), for SSE replay.
     pub fn snapshot(&self) -> Vec<LogLine> {
-        self.inner
-            .lock()
-            .unwrap()
-            .buf
-            .iter()
+        self.inner.lock().unwrap()
+            .buf.iter()
             .map(|(_, l)| l.clone())
             .collect()
     }
 
-    /// Subscribe to future log lines.
+    /// Subscribe to future lines.
     pub fn subscribe(&self) -> broadcast::Receiver<LogLine> {
         self.tx.subscribe()
     }
 
-    pub fn close(&self) {
-        self.inner.lock().unwrap().log_file.take();
-    }
-}
-
-impl Drop for LogBuffer {
-    fn drop(&mut self) {
-        self.close();
+    /// Clear both the in-memory buffer and the persisted DB rows.
+    /// After this, `snapshot()` returns `[]` and a fresh page load
+    /// will start with an empty console.
+    pub fn clear(&self) {
+        self.inner.lock().unwrap().buf.clear();
+        if let Err(e) = self.db.log_clear(&self.server_id) {
+            tracing::warn!("log_clear failed for {}: {}", self.server_id, e);
+        }
     }
 }

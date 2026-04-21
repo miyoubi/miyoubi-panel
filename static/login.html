@@ -6,66 +6,136 @@
 <title>Miyoubi Panel — Sign in</title>
 <link rel="icon" type="image/png" href="/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a0a0a;--card:#141414;--card2:#1a1a1a;--border:#222;--border2:#2a2a2a;--text:#e8e8e8;--muted:#666;--muted2:#444;--accent:#fff;--red:#ef4444;--font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;display:flex;align-items:center;justify-content:center}
-.box{width:360px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:32px}
-.logo{display:flex;align-items:center;gap:10px;margin-bottom:28px}
-.logo-icon{width:34px;height:34px;background:var(--card2);border:1px solid var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
-.logo-text{font-size:1.05rem;font-weight:600}
-.logo-text span{color:var(--muted);font-weight:400}
-h2{font-size:1.1rem;font-weight:600;margin-bottom:4px}
-.sub{font-size:0.78rem;color:var(--muted);margin-bottom:24px}
-.group{margin-bottom:14px}
-label{font-size:0.72rem;font-weight:500;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;display:block;margin-bottom:6px}
-input{width:100%;background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:9px 12px;font-family:var(--font);font-size:0.85rem;color:var(--text);outline:none;transition:border-color .15s}
-input:focus{border-color:#444}
-input::placeholder{color:var(--muted2)}
-.btn{width:100%;margin-top:8px;background:var(--accent);color:#000;border:none;border-radius:6px;padding:10px;font-family:var(--font);font-size:0.85rem;font-weight:600;cursor:pointer;transition:opacity .15s}
-.btn:hover{opacity:.88}
-.btn:disabled{opacity:.5;cursor:not-allowed}
-.err{font-size:0.75rem;color:var(--red);margin-top:10px;display:none;text-align:center}
+:root {
+  --bg:      #141210;
+  --sb:      #1a1714;
+  --card:    #1f1c19;
+  --card2:   #252119;
+  --card3:   #2a261f;
+  --border:  #2e2922;
+  --border2: #362f26;
+  --text:    #e8e2d9;
+  --muted:   #7a6f62;
+  --muted2:  #4a4238;
+  --accent:  #c8b89a;
+  --red:     #d4635a;
+  --font:    'Instrument Sans', sans-serif;
+  --mono:    'Geist Mono', monospace;
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.shell {
+  width: 100%; max-width: 380px; padding: 20px;
+  display: flex; flex-direction: column; gap: 0;
+}
+
+/* Card */
+.box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 28px 28px 24px;
+}
+
+/* Logo */
+.logo {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 26px;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border);
+}
+.logo-icon {
+  width: 26px; height: 26px; background: var(--card2);
+  border: 1px solid var(--border2); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0; overflow: hidden;
+}
+.logo-text { font-size: 0.82rem; font-weight: 600; letter-spacing: -.02em; }
+.logo-text span { color: var(--muted); font-weight: 400; }
+
+/* Heading */
+.heading { font-size: 1.05rem; font-weight: 600; letter-spacing: -.02em; margin-bottom: 3px; }
+.sub { font-size: 0.73rem; color: var(--muted); margin-bottom: 22px; }
+
+/* Fields */
+.group { margin-bottom: 12px; }
+label {
+  font-size: 0.58rem; font-weight: 600; color: var(--muted2);
+  letter-spacing: .12em; text-transform: uppercase; display: block; margin-bottom: 5px;
+}
+input {
+  width: 100%; background: var(--card2); border: 1px solid var(--border2);
+  border-radius: 5px; padding: 8px 11px; font-family: var(--font);
+  font-size: 0.82rem; color: var(--text); outline: none; transition: border-color .15s;
+}
+input:focus { border-color: var(--border); }
+input::placeholder { color: var(--muted2); }
+
+/* Button */
+.btn {
+  width: 100%; margin-top: 10px; background: var(--accent); color: #1a1714;
+  border: none; border-radius: 5px; padding: 9px; font-family: var(--font);
+  font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: opacity .15s;
+  letter-spacing: .01em;
+}
+.btn:hover { opacity: .88; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Error */
+.err {
+  font-size: 0.72rem; color: var(--red); margin-top: 10px;
+  display: none; text-align: center; padding: 7px 10px;
+  background: rgba(212,99,90,.07); border: 1px solid rgba(212,99,90,.2);
+  border-radius: 4px;
+}
+
+/* Footer */
+.footer { font-size: 0.58rem; color: var(--muted2); text-align: center; margin-top: 16px; }
 </style>
 </head>
 <body>
-<div class="box">
-  <div class="logo">
-    <div class="logo-icon">&#x26F0;</div>
-    <div class="logo-text">Miyoubi<span> Panel</span></div>
+<div class="shell">
+  <div class="box">
+    <div class="logo">
+      <div class="logo-icon">&#x26F0;</div>
+      <div class="logo-text">Miyoubi<span> Panel</span></div>
+    </div>
+    <div class="heading">Sign in</div>
+    <div class="sub">Enter your credentials to continue</div>
+    <div class="group">
+      <label>Username</label>
+      <input id="u" type="text" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="group">
+      <label>Password</label>
+      <input id="p" type="password" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="btn" id="btn" onclick="login()">Sign in</button>
+    <div class="err" id="err">Invalid username or password</div>
   </div>
-  <h2>Sign in</h2>
-  <div class="sub">Enter your credentials to continue</div>
-  <div class="group">
-    <label>Username</label>
-    <input id="u" type="text" placeholder="admin" autocomplete="username">
-  </div>
-  <div class="group">
-    <label>Password</label>
-    <input id="p" type="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" autocomplete="current-password"
-           onkeydown="if(event.key==='Enter')login()">
-  </div>
-  <button class="btn" id="btn" onclick="login()">Sign in</button>
-  <div class="err" id="err">Invalid username or password</div>
+  <div class="footer">Miyoubi Panel &mdash; Minecraft server management</div>
 </div>
 <script>
-// If already logged in (valid cookie + backend confirms it), go straight to app.
 (async function() {
   try {
     var r = await fetch('/api/auth/me');
-    if (r.ok) { window.location.replace('/'); }
+    if (r.ok) { window.location.replace('/'); return; }
+    var d = await r.json().catch(function(){return {};});
+    if (d.setup_required) { window.location.replace('/setup'); return; }
   } catch(e) {}
 })();
 
 async function login() {
-  var u = document.getElementById('u').value.trim();
-  var p = document.getElementById('p').value;
+  var u   = document.getElementById('u').value.trim();
+  var p   = document.getElementById('p').value;
   var err = document.getElementById('err');
   var btn = document.getElementById('btn');
   err.style.display = 'none';
   btn.disabled = true; btn.textContent = 'Signing in...';
-
   try {
     var res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -74,10 +144,11 @@ async function login() {
     });
     var data = await res.json();
     if (res.ok && data.ok) {
-      // Set cookie (7 days)
       var exp = new Date(Date.now() + 7 * 864e5).toUTCString();
       document.cookie = 'mcpanel_user=' + encodeURIComponent(u) + '; expires=' + exp + '; path=/; SameSite=Strict';
       window.location.replace('/');
+    } else if (data.setup_required) {
+      window.location.replace('/setup');
     } else {
       err.textContent = data.message || 'Invalid username or password';
       err.style.display = 'block';

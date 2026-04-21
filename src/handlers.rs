@@ -24,7 +24,8 @@ use anyhow::Context as AnyhowContext;
 #[derive(Clone)]
 pub struct AppState {
     pub registry: Arc<ServerRegistry>,
-    pub users: crate::users::UserStore,
+    pub users:    crate::users::UserStore,
+    pub db:       crate::db::Db,
 }
 
 // ── Error handling ────────────────────────────────────────────────────────
@@ -57,13 +58,31 @@ where
 
 // ── Frontend ──────────────────────────────────────────────────────────────
 
-static INDEX_HTML:  &str = include_str!("../static/index.html");
-static LOGIN_HTML:  &str = include_str!("../static/login.html");
-static VIEWER_HTML: &str = include_str!("../static/viewer.html");
+static INDEX_HTML:     &str = include_str!("../static/index.html");
+static LOGIN_HTML:     &str = include_str!("../static/login.html");
+static VIEWER_HTML:    &str = include_str!("../static/viewer.html");
+static DASHBOARD_HTML: &str = include_str!("../static/dashboard.html");
+static MOBILE_HTML:    &str = include_str!("../static/mobile.html");
+static SETUP_HTML:     &str = include_str!("../static/setup.html");
 
-pub async fn serve_frontend() -> Html<&'static str> { Html(INDEX_HTML) }
-pub async fn serve_login()    -> Html<&'static str> { Html(LOGIN_HTML) }
-pub async fn serve_viewer()   -> Html<&'static str> { Html(VIEWER_HTML) }
+pub async fn serve_frontend()  -> Html<&'static str> { Html(INDEX_HTML) }
+pub async fn serve_login()     -> Html<&'static str> { Html(LOGIN_HTML) }
+pub async fn serve_viewer()    -> Html<&'static str> { Html(VIEWER_HTML) }
+pub async fn serve_mobile() -> Html<&'static str> { Html(MOBILE_HTML) }
+
+pub async fn serve_dashboard(
+    headers: axum::http::HeaderMap,
+) -> Html<&'static str> {
+    // Serve the mobile UI when the client is a phone or narrow-screen device
+    let ua = headers
+        .get(axum::http::header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let is_mobile = ua.contains("Mobile") || ua.contains("Android")
+        || ua.contains("iPhone") || ua.contains("iPad");
+    if is_mobile { Html(MOBILE_HTML) } else { Html(INDEX_HTML) }
+}
+pub async fn serve_setup()     -> Html<&'static str> { Html(SETUP_HTML) }
 
 // ── Server list & create ──────────────────────────────────────────────────
 
@@ -177,6 +196,7 @@ pub async fn start(
 ) -> ApiResult<impl IntoResponse> {
     let inst = get_server!(s, id);
     ServerRegistry::compose_up(&inst).await?;
+    inst.log_buffer.clear();
     inst.log_buffer.push("[panel] Server starting...".into(), "panel");
     Ok(Json(serde_json::json!({"ok": true, "message": "server starting"})))
 }
@@ -197,11 +217,30 @@ pub async fn restart(
 ) -> ApiResult<impl IntoResponse> {
     let inst = get_server!(s, id);
     ServerRegistry::compose_restart(&inst).await?;
+    inst.log_buffer.clear();
     inst.log_buffer.push("[panel] Server restarting...".into(), "panel");
     Ok(Json(serde_json::json!({"ok": true, "message": "server restarting"})))
 }
 
 // ── Console SSE ───────────────────────────────────────────────────────────
+
+// POST /api/servers/:id/logs/clear — wipes both in-memory buffer and DB rows.
+// The next SSE snapshot will be empty; pressing Clear in the UI calls this.
+pub async fn logs_clear(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    if cookie_user(&headers).is_none() {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"ok": false}))).into_response();
+    }
+    let inst = match s.registry.get(&id) {
+        Some(i) => i,
+        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"ok": false, "message": "server not found"}))).into_response(),
+    };
+    inst.log_buffer.clear();
+    Json(serde_json::json!({"ok": true})).into_response()
+}
 
 pub async fn stream_logs(
     State(s): State<AppState>,
@@ -562,18 +601,40 @@ pub fn cookie_user(headers: &HeaderMap) -> Option<String> {
 }
 
 // POST /api/auth/login  { username, password }
+// Sets an HttpOnly session cookie on success — the browser stores it
+// automatically and it cannot be read by JavaScript.
 pub async fn auth_login(
     State(s): State<AppState>,
     Json(body): Json<serde_json::Value>,
 ) -> impl IntoResponse {
+    // Block login entirely until the first-run setup is complete.
+    if s.users.is_empty() {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(serde_json::json!({"ok": false, "message": "Setup required", "setup_required": true})),
+        ).into_response();
+    }
     let username = body["username"].as_str().unwrap_or_default();
     let password = body["password"].as_str().unwrap_or_default();
     match s.users.authenticate(username, password) {
-        Some(role) => Json(serde_json::json!({
-            "ok": true,
-            "username": username,
-            "role": role.to_string(),
-        })).into_response(),
+        Some(role) => {
+            // Encode the username for the cookie value
+            let cookie_val = urlencoding::encode(username).into_owned();
+            // HttpOnly + SameSite=Strict prevents JS access and CSRF
+            let cookie = format!(
+                "mcpanel_user={}; Path=/; Max-Age=604800; HttpOnly; SameSite=Strict",
+                cookie_val
+            );
+            (
+                StatusCode::OK,
+                [(axum::http::header::SET_COOKIE, cookie)],
+                Json(serde_json::json!({
+                    "ok": true,
+                    "username": username,
+                    "role": role.to_string(),
+                })),
+            ).into_response()
+        }
         None => (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"ok": false, "message": "Invalid credentials"})),
@@ -581,11 +642,28 @@ pub async fn auth_login(
     }
 }
 
+// POST /api/auth/logout — clears the session cookie
+pub async fn auth_logout() -> impl IntoResponse {
+    let cookie = "mcpanel_user=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict";
+    (
+        StatusCode::OK,
+        [(axum::http::header::SET_COOKIE, cookie)],
+        Json(serde_json::json!({"ok": true})),
+    )
+}
+
 // GET /api/auth/me  — returns logged-in user info from cookie
 pub async fn auth_me(
     State(s): State<AppState>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
+    // If no users exist at all, signal setup_required
+    if s.users.is_empty() {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"ok": false, "setup_required": true})),
+        ).into_response();
+    }
     if let Some(user) = cookie_user(&headers) {
         if let Some(role) = s.users.role_of(&user) {
             let allowed = s.users.allowed_servers(&user);
@@ -736,6 +814,186 @@ pub async fn users_set_servers(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"ok":false,"message":e.to_string()}))).into_response(),
     }
 }
+
+
+// ── Dashboard — global summary across all servers ─────────────────────────
+//
+// Returns:
+//   servers:    [ { id, name, port, running, uptime, status } ]
+//   total:      total server count
+//   online:     count of running servers
+//   players:    total online players (best-effort, skipped if server offline)
+//   host:       { mem_total_mb, mem_used_mb, mem_pct, load1, load5, load15 }
+
+pub async fn dashboard(
+    State(s): State<AppState>,
+) -> impl IntoResponse {
+    let defs = s.registry.list();
+
+    // Collect per-server status concurrently with a short timeout each.
+    let mut server_rows = Vec::with_capacity(defs.len());
+    let mut online_count: u32 = 0;
+    let mut total_players: u32 = 0;
+
+    for def in &defs {
+        let status = if let Some(inst) = s.registry.get(&def.id) {
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(4),
+                inst.docker.get_status(),
+            ).await {
+                Ok(st) => {
+                    if st.running { online_count += 1; }
+                    // Best-effort player count via RCON — skip if offline/slow
+                    if st.running {
+                        if let Ok(Ok(pl)) = tokio::time::timeout(
+                            std::time::Duration::from_secs(3),
+                            inst.docker.get_players(),
+                        ).await {
+                            total_players += pl.count as u32;
+                        }
+                    }
+                    st
+                }
+                Err(_) => crate::docker::ServerStatus::default(),
+            }
+        } else {
+            crate::docker::ServerStatus::default()
+        };
+
+        server_rows.push(serde_json::json!({
+            "id":      def.id,
+            "name":    def.name,
+            "port":    def.port,
+            "running": status.running,
+            "status":  status.status,
+            "uptime":  status.uptime,
+        }));
+    }
+
+    // ── Host system stats (Linux /proc — zero extra deps) ─────────────────
+    let host = read_host_stats();
+
+    Json(serde_json::json!({
+        "servers": server_rows,
+        "total":   defs.len(),
+        "online":  online_count,
+        "players": total_players,
+        "host":    host,
+    })).into_response()
+}
+
+fn read_host_stats() -> serde_json::Value {
+    // Memory from /proc/meminfo
+    let (mem_total, mem_avail) = std::fs::read_to_string("/proc/meminfo")
+        .unwrap_or_default()
+        .lines()
+        .fold((0u64, 0u64), |(t, a), line| {
+            let mut parts = line.split_whitespace();
+            match parts.next() {
+                Some("MemTotal:")     => (parts.next().and_then(|v| v.parse().ok()).unwrap_or(t), a),
+                Some("MemAvailable:") => (t, parts.next().and_then(|v| v.parse().ok()).unwrap_or(a)),
+                _ => (t, a),
+            }
+        });
+
+    let mem_total_mb = mem_total / 1024;
+    let mem_used_mb  = mem_total.saturating_sub(mem_avail) / 1024;
+    let mem_pct      = if mem_total > 0 { mem_used_mb as f64 / mem_total_mb as f64 * 100.0 } else { 0.0 };
+
+    // Load averages from /proc/loadavg
+    let loadavg = std::fs::read_to_string("/proc/loadavg").unwrap_or_default();
+    let mut la = loadavg.split_whitespace();
+    let load1  = la.next().and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+    let load5  = la.next().and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+    let load15 = la.next().and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+
+    // CPU count for normalising load (optional nice-to-have)
+    let cpu_count = std::fs::read_to_string("/proc/cpuinfo")
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| l.starts_with("processor"))
+        .count()
+        .max(1);
+
+    serde_json::json!({
+        "mem_total_mb": mem_total_mb,
+        "mem_used_mb":  mem_used_mb,
+        "mem_pct":      mem_pct,
+        "load1":        load1,
+        "load5":        load5,
+        "load15":       load15,
+        "cpu_count":    cpu_count,
+    })
+}
+
+// ── First-run setup ───────────────────────────────────────────────────────
+//
+// GET  /api/setup  — returns { needs_setup: true/false }
+// POST /api/setup  { username, password } — creates the initial admin account.
+//                   Only works when no users exist. Locked out once setup is done.
+
+pub async fn setup_status(
+    State(s): State<AppState>,
+) -> impl IntoResponse {
+    Json(serde_json::json!({ "needs_setup": s.users.is_empty() }))
+}
+
+#[derive(Deserialize)]
+pub struct SetupBody {
+    pub username: String,
+    pub password: String,
+}
+
+pub async fn setup_create(
+    State(s): State<AppState>,
+    Json(body): Json<SetupBody>,
+) -> impl IntoResponse {
+    // Once any users exist this endpoint is permanently disabled.
+    if !s.users.is_empty() {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"ok": false, "message": "Setup already completed"})),
+        ).into_response();
+    }
+
+    let username = body.username.trim();
+    let password = body.password.trim();
+
+    if username.is_empty() || password.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"ok": false, "message": "Username and password are required"})),
+        ).into_response();
+    }
+    if password.len() < 8 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"ok": false, "message": "Password must be at least 8 characters"})),
+        ).into_response();
+    }
+
+    match s.users.create(username, password, crate::users::UserRole::Admin) {
+        Ok(()) => {
+            tracing::info!("First-run setup complete — admin account '{}' created", username);
+            // Log the user in immediately by setting the session cookie
+            let cookie_val = urlencoding::encode(username).into_owned();
+            let cookie = format!(
+                "mcpanel_user={}; Path=/; Max-Age=604800; HttpOnly; SameSite=Strict",
+                cookie_val
+            );
+            (
+                StatusCode::OK,
+                [(axum::http::header::SET_COOKIE, cookie)],
+                Json(serde_json::json!({"ok": true, "username": username, "role": "admin"})),
+            ).into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"ok": false, "message": e.to_string()})),
+        ).into_response(),
+    }
+}
+
 
 fn is_admin(s: &AppState, headers: &HeaderMap) -> bool {
     cookie_user(headers)

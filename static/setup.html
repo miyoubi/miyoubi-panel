@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Miyoubi Panel — Setup</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #141210;
+  --sb:      #1a1714;
+  --card:    #1f1c19;
+  --card2:   #252119;
+  --card3:   #2a261f;
+  --border:  #2e2922;
+  --border2: #362f26;
+  --text:    #e8e2d9;
+  --muted:   #7a6f62;
+  --muted2:  #4a4238;
+  --accent:  #c8b89a;
+  --green:   #6dbd8a;
+  --red:     #d4635a;
+  --amber:   #d4a45a;
+  --font:    'Instrument Sans', sans-serif;
+  --mono:    'Geist Mono', monospace;
+}
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.shell {
+  width: 100%; max-width: 400px; padding: 20px;
+  display: flex; flex-direction: column; gap: 0;
+}
+
+/* Card */
+.box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 28px 28px 24px;
+}
+
+/* Logo */
+.logo {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 20px;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border);
+}
+.logo-icon {
+  width: 26px; height: 26px; background: var(--card2);
+  border: 1px solid var(--border2); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; flex-shrink: 0;
+}
+.logo-text { font-size: 0.82rem; font-weight: 600; letter-spacing: -.02em; }
+.logo-text span { color: var(--muted); font-weight: 400; }
+
+/* First-run badge */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(109,189,138,.08); border: 1px solid rgba(109,189,138,.2);
+  color: var(--green); font-size: 0.6rem; font-weight: 600;
+  padding: 3px 9px; border-radius: 10px; letter-spacing: .06em;
+  text-transform: uppercase; margin-bottom: 14px;
+}
+
+/* Heading */
+.heading { font-size: 1.05rem; font-weight: 600; letter-spacing: -.02em; margin-bottom: 3px; }
+.sub { font-size: 0.73rem; color: var(--muted); margin-bottom: 22px; line-height: 1.55; }
+
+/* Fields */
+.group { margin-bottom: 12px; }
+label {
+  font-size: 0.58rem; font-weight: 600; color: var(--muted2);
+  letter-spacing: .12em; text-transform: uppercase; display: block; margin-bottom: 5px;
+}
+input {
+  width: 100%; background: var(--card2); border: 1px solid var(--border2);
+  border-radius: 5px; padding: 8px 11px; font-family: var(--font);
+  font-size: 0.82rem; color: var(--text); outline: none; transition: border-color .15s;
+}
+input:focus { border-color: var(--border); }
+input::placeholder { color: var(--muted2); }
+
+/* Password strength bar */
+.strength-track {
+  height: 2px; background: var(--border); border-radius: 2px;
+  margin-top: 7px; overflow: hidden;
+}
+.strength-fill {
+  height: 100%; border-radius: 2px; width: 0%;
+  transition: width .3s, background .3s;
+}
+.strength-hint { font-size: 0.62rem; color: var(--muted2); margin-top: 4px; }
+
+/* Button */
+.btn {
+  width: 100%; margin-top: 10px; background: var(--accent); color: #1a1714;
+  border: none; border-radius: 5px; padding: 9px; font-family: var(--font);
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: opacity .15s; letter-spacing: .01em;
+}
+.btn:hover { opacity: .88; }
+.btn:active { opacity: .78; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Error */
+.err {
+  font-size: 0.72rem; color: var(--red); margin-top: 10px;
+  display: none; text-align: center; padding: 7px 10px;
+  background: rgba(212,99,90,.07); border: 1px solid rgba(212,99,90,.2);
+  border-radius: 4px;
+}
+
+/* Footer note */
+.footer { font-size: 0.58rem; color: var(--muted2); text-align: center; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="box">
+    <div class="logo">
+      <div class="logo-icon">&#x26F0;</div>
+      <div class="logo-text">Miyoubi<span> Panel</span></div>
+    </div>
+
+    <div class="badge">&#x2728; First Run</div>
+    <div class="heading">Create your admin account</div>
+    <div class="sub">
+      No accounts exist yet. Set up your admin credentials to get started —
+      this page is only available once.
+    </div>
+
+    <div class="group">
+      <label for="u">Username</label>
+      <input id="u" type="text" placeholder="admin" autocomplete="username" autofocus>
+    </div>
+    <div class="group">
+      <label for="p">Password</label>
+      <input id="p" type="password" placeholder="At least 8 characters"
+             autocomplete="new-password" oninput="checkStrength()"
+             onkeydown="if(event.key==='Enter')setup()">
+      <div class="strength-track"><div class="strength-fill" id="strength-fill"></div></div>
+      <div class="strength-hint" id="strength-hint">Enter a password</div>
+    </div>
+    <div class="group">
+      <label for="p2">Confirm Password</label>
+      <input id="p2" type="password" placeholder="Repeat password"
+             autocomplete="new-password" onkeydown="if(event.key==='Enter')setup()">
+    </div>
+
+    <button class="btn" id="btn" onclick="setup()">Create Account &amp; Continue</button>
+    <div class="err" id="err"></div>
+  </div>
+  <div class="footer">Miyoubi Panel &mdash; first-run setup</div>
+</div>
+
+<script>
+// Redirect away if setup is already done
+(async function() {
+  try {
+    var r = await fetch('/api/setup');
+    var d = await r.json();
+    if (!d.needs_setup) window.location.replace('/');
+  } catch(e) {}
+})();
+
+function checkStrength() {
+  var p    = document.getElementById('p').value;
+  var fill = document.getElementById('strength-fill');
+  var hint = document.getElementById('strength-hint');
+  var score = 0;
+  if (p.length >= 8)  score++;
+  if (p.length >= 12) score++;
+  if (/[A-Z]/.test(p) && /[a-z]/.test(p)) score++;
+  if (/[0-9]/.test(p)) score++;
+  if (/[^A-Za-z0-9]/.test(p)) score++;
+  var pct = (score / 5 * 100).toFixed(0) + '%';
+  var col = score <= 1 ? 'var(--red)' : score <= 3 ? 'var(--amber)' : 'var(--green)';
+  var txt = p.length === 0 ? 'Enter a password'
+           : score <= 1   ? 'Weak'
+           : score <= 3   ? 'Fair'
+           : score <= 4   ? 'Good' : 'Strong';
+  fill.style.width      = pct;
+  fill.style.background = col;
+  hint.textContent      = txt;
+}
+
+async function setup() {
+  var u   = document.getElementById('u').value.trim();
+  var p   = document.getElementById('p').value;
+  var p2  = document.getElementById('p2').value;
+  var err = document.getElementById('err');
+  var btn = document.getElementById('btn');
+
+  err.style.display = 'none';
+
+  if (!u)           { showErr('Username is required'); return; }
+  if (p.length < 8) { showErr('Password must be at least 8 characters'); return; }
+  if (p !== p2)     { showErr('Passwords do not match'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating account\u2026';
+
+  try {
+    var res = await fetch('/api/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    var data = await res.json();
+    if (res.ok && data.ok) {
+      window.location.replace('/');
+    } else {
+      showErr(data.message || 'Setup failed');
+    }
+  } catch(e) {
+    showErr('Could not reach the server');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create Account & Continue';
+  }
+}
+
+function showErr(msg) {
+  var el = document.getElementById('err');
+  el.textContent    = msg;
+  el.style.display  = 'block';
+}
+</script>
+</body>
+</html>

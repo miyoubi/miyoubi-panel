@@ -1,16 +1,19 @@
-//! User account management.
+//! User account management — backed by SQLite via `crate::db::Db`.
 //!
-//! Users are stored in `config/users.json`.
 //! Two roles:
-//!   - Admin  : full access (default for the first account)
-//!   - Viewer : read-only — can see status cards, players, and use
-//!              Start / Stop / Restart buttons. No files, mods, config, etc.
+//!   - Admin  : full access
+//!   - Viewer : read-only status, players, Start/Stop/Restart only
+//!
+//! On first run the `users` table is empty. `needs_setup()` returns true
+//! and the panel serves the /setup wizard. Once the first admin is created,
+//! setup is permanently disabled.
 
-use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::str::FromStr;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+
+use crate::db::Db;
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -30,13 +33,22 @@ impl std::fmt::Display for UserRole {
     }
 }
 
+impl FromStr for UserRole {
+    type Err = ();
+    fn from_str(s: &str) -> std::result::Result<Self, ()> {
+        match s {
+            "admin"  => Ok(UserRole::Admin),
+            "viewer" => Ok(UserRole::Viewer),
+            _        => Err(()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
-    pub username: String,
-    pub password: String,   // stored plain-text for simplicity
-    pub role:     UserRole,
-    /// If Some, viewer users can only see/control these server IDs.
-    /// None means unrestricted (all servers). Ignored for admin role.
+    pub username:        String,
+    pub password:        String,
+    pub role:            UserRole,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub allowed_servers: Option<Vec<String>>,
 }
@@ -44,16 +56,16 @@ pub struct User {
 /// What we expose over the API (no password).
 #[derive(Debug, Clone, Serialize)]
 pub struct UserInfo {
-    pub username: String,
-    pub role:     UserRole,
+    pub username:        String,
+    pub role:            UserRole,
     pub allowed_servers: Option<Vec<String>>,
 }
 
 impl From<&User> for UserInfo {
     fn from(u: &User) -> Self {
         UserInfo {
-            username: u.username.clone(),
-            role: u.role.clone(),
+            username:        u.username.clone(),
+            role:            u.role.clone(),
             allowed_servers: u.allowed_servers.clone(),
         }
     }
@@ -63,95 +75,75 @@ impl From<&User> for UserInfo {
 
 #[derive(Clone)]
 pub struct UserStore {
-    inner: Arc<RwLock<Inner>>,
-}
-
-struct Inner {
-    path:  PathBuf,
-    users: Vec<User>,
+    db: Db,
 }
 
 impl UserStore {
-    /// Load (or create) the user store from `config_dir/users.json`.
-    /// If the file doesn't exist, an admin account `admin`/`admin` is created.
-    pub fn load(config_dir: &str) -> Result<Self> {
-        let path = PathBuf::from(config_dir).join("users.json");
-
-        let users: Vec<User> = if path.exists() {
-            let raw = std::fs::read_to_string(&path)
-                .context("reading users.json")?;
-            serde_json::from_str(&raw).context("parsing users.json")?
-        } else {
-            // Bootstrap: create default admin account
-            let defaults = vec![User {
-                username: "admin".into(),
-                password: "admin".into(),
-                role:     UserRole::Admin,
-                allowed_servers: None,
-            }];
-            let raw = serde_json::to_string_pretty(&defaults)?;
-            std::fs::write(&path, &raw).context("writing users.json")?;
-            defaults
-        };
-
-        Ok(Self {
-            inner: Arc::new(RwLock::new(Inner { path, users })),
-        })
+    /// Create a UserStore backed by the shared database.
+    pub fn new(db: Db) -> Self {
+        Self { db }
     }
 
-    fn save(inner: &Inner) -> Result<()> {
-        let raw = serde_json::to_string_pretty(&inner.users)?;
-        std::fs::write(&inner.path, &raw).context("saving users.json")
+    /// True when no users exist yet (first run — setup wizard required).
+    pub fn needs_setup(db: &Db) -> bool {
+        db.user_count().unwrap_or(0) == 0
     }
 
     /// Authenticate. Returns the user's role on success.
     pub fn authenticate(&self, username: &str, password: &str) -> Option<UserRole> {
-        let inner = self.inner.read().unwrap();
-        inner.users.iter().find(|u| u.username == username && u.password == password)
-            .map(|u| u.role.clone())
+        self.db.users_all().ok()?
+            .into_iter()
+            .find(|u| u.username == username && u.password == password)
+            .map(|u| u.role)
+    }
+
+    /// True if no users exist.
+    pub fn is_empty(&self) -> bool {
+        self.db.user_count().unwrap_or(0) == 0
     }
 
     /// List all users (without passwords).
     pub fn list(&self) -> Vec<UserInfo> {
-        self.inner.read().unwrap().users.iter().map(UserInfo::from).collect()
+        self.db.users_all()
+            .unwrap_or_default()
+            .iter()
+            .map(UserInfo::from)
+            .collect()
     }
 
     /// Create a new user. Fails if username already exists.
     pub fn create(&self, username: &str, password: &str, role: UserRole) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
-        if inner.users.iter().any(|u| u.username == username) {
-            anyhow::bail!("user '{}' already exists", username);
-        }
         if username.is_empty() || password.is_empty() {
             anyhow::bail!("username and password must not be empty");
         }
-        inner.users.push(User { username: username.into(), password: password.into(), role, allowed_servers: None });
-        Self::save(&inner)
+        let all = self.db.users_all()?;
+        if all.iter().any(|u| u.username == username) {
+            anyhow::bail!("user '{}' already exists", username);
+        }
+        self.db.user_upsert(&User {
+            username:        username.into(),
+            password:        password.into(),
+            role,
+            allowed_servers: None,
+        })
     }
 
     /// Delete a user. Fails if trying to delete the last admin.
     pub fn delete(&self, username: &str) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
-        let idx = inner.users.iter().position(|u| u.username == username)
+        let all = self.db.users_all()?;
+        let target = all.iter().find(|u| u.username == username)
             .ok_or_else(|| anyhow::anyhow!("user not found"))?;
-
-        // Prevent deleting the last admin
-        let is_admin = inner.users[idx].role == UserRole::Admin;
-        let admin_count = inner.users.iter().filter(|u| u.role == UserRole::Admin).count();
-        if is_admin && admin_count == 1 {
+        if target.role == UserRole::Admin && self.db.admin_count()? <= 1 {
             anyhow::bail!("cannot delete the last admin account");
         }
-
-        inner.users.remove(idx);
-        Self::save(&inner)
+        self.db.user_delete(username)
     }
 
     /// Update a user's password and/or role.
     pub fn update(&self, username: &str, password: Option<&str>, role: Option<UserRole>) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
-        let user = inner.users.iter_mut().find(|u| u.username == username)
+        let mut all = self.db.users_all()?;
+        let user = all.iter_mut().find(|u| u.username == username)
             .ok_or_else(|| anyhow::anyhow!("user not found"))?;
-
         if let Some(p) = password {
             if p.is_empty() { anyhow::bail!("password must not be empty"); }
             user.password = p.into();
@@ -159,29 +151,37 @@ impl UserStore {
         if let Some(r) = role {
             user.role = r;
         }
-        Self::save(&inner)
+        self.db.user_upsert(user)
     }
 
-    /// Look up a single user's role by username (for cookie validation).
+    /// Look up a single user's role (for cookie validation).
     pub fn role_of(&self, username: &str) -> Option<UserRole> {
-        self.inner.read().unwrap()
-            .users.iter().find(|u| u.username == username)
-            .map(|u| u.role.clone())
+        self.db.users_all().ok()?
+            .into_iter()
+            .find(|u| u.username == username)
+            .map(|u| u.role)
     }
 
     /// Get the list of server IDs this user can access (None = all).
     pub fn allowed_servers(&self, username: &str) -> Option<Vec<String>> {
-        self.inner.read().unwrap()
-            .users.iter().find(|u| u.username == username)
-            .and_then(|u| u.allowed_servers.clone())
+        self.db.users_all().ok()?
+            .into_iter()
+            .find(|u| u.username == username)
+            .and_then(|u| u.allowed_servers)
     }
 
     /// Set which server IDs a viewer can access. Pass None to allow all.
     pub fn set_allowed_servers(&self, username: &str, ids: Option<Vec<String>>) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
-        let user = inner.users.iter_mut().find(|u| u.username == username)
+        let mut all = self.db.users_all()?;
+        let user = all.iter_mut().find(|u| u.username == username)
             .ok_or_else(|| anyhow::anyhow!("user not found"))?;
         user.allowed_servers = ids;
-        Self::save(&inner)
+        self.db.user_upsert(user)
+    }
+
+    /// Create the initial admin account (called by /api/setup).
+    pub fn bootstrap(&self, username: &str, password: &str) -> Result<()> {
+        self.create(username, password, UserRole::Admin)
+            .context("creating initial admin account")
     }
 }

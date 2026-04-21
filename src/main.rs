@@ -1,4 +1,5 @@
 mod backup;
+mod db;
 mod docker;
 mod files;
 mod handlers;
@@ -22,6 +23,7 @@ use tracing::info;
 use handlers::AppState;
 use registry::ServerRegistry;
 use setup::TlsConfig;
+use db::Db;
 
 #[tokio::main]
 async fn main() {
@@ -51,28 +53,37 @@ async fn main() {
     };
     let config_dir = config_dir.to_string_lossy().to_string();
 
+    // ── Database ─────────────────────────────────────────────────────────
+    let db = Db::open(&config_dir).expect("Failed to open panel database");
+
     // ── TLS wizard ───────────────────────────────────────────────────────
-    // If --reconfigure flag passed, delete tls.json so the wizard re-runs.
+    // If --reconfigure flag passed, clear the TLS row so the wizard re-runs.
     if std::env::args().any(|a| a == "--reconfigure") {
-        let tls_path = PathBuf::from(&config_dir).join("tls.json");
-        let _ = std::fs::remove_file(&tls_path);
-        println!("Removed tls.json — re-running setup wizard...");
+        db.tls_save(&TlsConfig::disabled()).expect("Failed to reset TLS config");
+        println!("TLS config reset — re-running setup wizard...");
     }
 
-    let tls_cfg = setup::load_or_run_wizard(&config_dir)
+    let tls_cfg = setup::load_or_run_wizard(&config_dir, &db)
         .await
         .expect("TLS setup failed");
 
     // ── Registry ─────────────────────────────────────────────────────────
-    let registry = ServerRegistry::load(&config_dir)
+    let registry = ServerRegistry::load(&config_dir, db.clone())
         .expect("Failed to load server registry");
     info!("Loaded {} server(s) from {}", registry.list().len(), config_dir);
 
-    let users = users::UserStore::load(&config_dir)
-        .expect("Failed to load user store");
+    // ── User store ───────────────────────────────────────────────────────
+    let users = users::UserStore::new(db.clone());
+    // CLI first-run wizard: only prompts if the DB has no users yet AND
+    // we're not running in web-setup mode (i.e. the /setup route handles it
+    // if someone lands there without accounts). We still support the CLI path
+    // for headless / automated deployments.
+    if users::UserStore::needs_setup(&db) && std::env::args().any(|a| a == "--cli-setup") {
+        run_account_wizard(&users).expect("Failed to create initial admin account");
+    }
     info!("User store loaded ({} accounts)", users.list().len());
 
-    let state = AppState { registry, users };
+    let state = AppState { registry, users, db: db.clone() };
 
     // ── Build the main app router ─────────────────────────────────────────
     let app = build_router(state);
@@ -85,6 +96,67 @@ async fn main() {
     }
 }
 
+// ── First-run account creation wizard ────────────────────────────────────────
+
+fn run_account_wizard(store: &users::UserStore) -> anyhow::Result<()> {
+    use std::io::{self, Write};
+
+    println!();
+    println!("╔══════════════════════════════════════════╗");
+    println!("║   Miyoubi Panel — Create Admin Account   ║");
+    println!("╚══════════════════════════════════════════╝");
+    println!();
+    println!("  No user accounts found. Set up your admin account to get started.");
+    println!();
+
+    let username = loop {
+        print!("  Admin username: ");
+        io::stdout().flush().unwrap();
+        let mut line = String::new();
+        io::stdin().read_line(&mut line).unwrap();
+        let name = line.trim().to_string();
+        if name.is_empty() {
+            println!("  Username cannot be empty.");
+            continue;
+        }
+        if name.contains(':') || name.contains(' ') {
+            println!("  Username cannot contain spaces or colons.");
+            continue;
+        }
+        break name;
+    };
+
+    let password = loop {
+        print!("  Password: ");
+        io::stdout().flush().unwrap();
+        // Read without echo if possible (rpassword not available — use stdin)
+        let mut line = String::new();
+        io::stdin().read_line(&mut line).unwrap();
+        let pass = line.trim().to_string();
+        if pass.len() < 8 {
+            println!("  Password must be at least 8 characters.");
+            continue;
+        }
+        print!("  Confirm password: ");
+        io::stdout().flush().unwrap();
+        let mut confirm = String::new();
+        io::stdin().read_line(&mut confirm).unwrap();
+        if pass != confirm.trim() {
+            println!("  Passwords do not match.");
+            continue;
+        }
+        break pass;
+    };
+
+    println!();
+    store.bootstrap(&username, &password)?;
+    println!("  ✓ Admin account '{}' created.", username);
+    println!();
+
+    Ok(())
+}
+
+
 fn build_router(state: AppState) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -92,6 +164,7 @@ fn build_router(state: AppState) -> Router {
         .allow_headers([header::CONTENT_TYPE]);
 
     Router::new()
+        .route("/api/dashboard",            get(handlers::dashboard))
         .route("/api/servers",              get(handlers::servers_list).post(handlers::servers_create))
         .route("/api/servers/:id",          delete(handlers::servers_delete))
         .route("/api/servers/:id/status",   get(handlers::status))
@@ -99,7 +172,8 @@ fn build_router(state: AppState) -> Router {
         .route("/api/servers/:id/start",    post(handlers::start))
         .route("/api/servers/:id/stop",     post(handlers::stop))
         .route("/api/servers/:id/restart",  post(handlers::restart))
-        .route("/api/servers/:id/logs",     get(handlers::stream_logs))
+        .route("/api/servers/:id/logs",       get(handlers::stream_logs))
+        .route("/api/servers/:id/logs/clear", post(handlers::logs_clear))
         .route("/api/servers/:id/command",  post(handlers::command))
         .route("/api/servers/:id/players",  get(handlers::players))
         .route("/api/servers/:id/files",         get(handlers::files_dir))
@@ -117,7 +191,9 @@ fn build_router(state: AppState) -> Router {
         .route("/favicon.png",              get(serve_favicon))
         // ── Auth ─────────────────────────────────────────────────────────
         .route("/api/auth/login",           post(handlers::auth_login))
+        .route("/api/auth/logout",          post(handlers::auth_logout))
         .route("/api/auth/me",             get(handlers::auth_me))
+        .route("/api/setup",               get(handlers::setup_status).post(handlers::setup_create))
         // ── User management (admin only) ──────────────────────────────────
         .route("/api/users",               get(handlers::users_list).post(handlers::users_create))
         .route("/api/users/:username",     put(handlers::users_update).delete(handlers::users_delete))
@@ -130,7 +206,11 @@ fn build_router(state: AppState) -> Router {
         .route("/s/:id",                   get(handlers::serve_status_page))
         // ── Frontend ──────────────────────────────────────────────────────
         .route("/login",                    get(handlers::serve_login))
+        .route("/setup",                    get(handlers::serve_setup))
         .route("/view",                     get(handlers::serve_viewer))
+        .route("/dashboard",               get(handlers::serve_dashboard))
+        .route("/mobile",                   get(handlers::serve_mobile))
+        .route("/server/:id",              get(handlers::serve_frontend))
         .route("/",                         get(handlers::serve_frontend))
         .with_state(state)
         .layer(cors)

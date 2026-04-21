@@ -39,18 +39,9 @@ impl TlsConfig {
 // ── Entry point ───────────────────────────────────────────────────────────
 
 /// Called at startup. Returns the TlsConfig to use.
-/// If `{config_dir}/tls.json` already exists, loads and returns it.
-/// Otherwise runs the interactive wizard.
-pub async fn load_or_run_wizard(config_dir: &str) -> Result<TlsConfig> {
-    let path = PathBuf::from(config_dir).join("tls.json");
-
-    if path.exists() {
-        let data = std::fs::read_to_string(&path)
-            .context("reading tls.json")?;
-        let cfg: TlsConfig = serde_json::from_str(&data)
-            .context("parsing tls.json")?;
-
-        // If TLS is enabled, verify the cert files still exist
+/// Loads from the database if a config exists, otherwise runs the interactive wizard.
+pub async fn load_or_run_wizard(config_dir: &str, db: &crate::db::Db) -> Result<TlsConfig> {
+    if let Some(cfg) = db.tls_load()? {
         if cfg.enabled {
             let cert_ok = cfg.cert.as_deref().map(|p| Path::new(p).exists()).unwrap_or(false);
             let key_ok  = cfg.key.as_deref().map(|p| Path::new(p).exists()).unwrap_or(false);
@@ -58,21 +49,19 @@ pub async fn load_or_run_wizard(config_dir: &str) -> Result<TlsConfig> {
                 tracing::info!("TLS: loaded config for {:?}", cfg.domain);
                 return Ok(cfg);
             }
-            // Cert files missing — re-run wizard
             eprintln!();
             eprintln!("⚠  TLS cert files not found — re-running TLS setup.");
-            eprintln!("   (Delete config/tls.json to skip TLS entirely)");
             eprintln!();
         } else {
             return Ok(cfg);
         }
     }
 
-    // First run — interactive wizard
-    run_wizard(config_dir, &path).await
+    // First run or cert missing — interactive wizard
+    run_wizard(config_dir, db).await
 }
 
-async fn run_wizard(config_dir: &str, save_path: &Path) -> Result<TlsConfig> {
+async fn run_wizard(config_dir: &str, db: &crate::db::Db) -> Result<TlsConfig> {
     print_banner();
 
     let want_https = prompt_bool(
@@ -82,7 +71,7 @@ async fn run_wizard(config_dir: &str, save_path: &Path) -> Result<TlsConfig> {
 
     if !want_https {
         let cfg = TlsConfig::disabled();
-        save_config(&cfg, save_path)?;
+        db.tls_save(&cfg)?;
         println!();
         println!("✓ Running without HTTPS on port 80.");
         println!("  Run with --reconfigure to change this later.");
@@ -124,7 +113,7 @@ async fn run_wizard(config_dir: &str, save_path: &Path) -> Result<TlsConfig> {
     let confirm = prompt_bool("Obtain certificate now?", true);
     if !confirm {
         let cfg = TlsConfig::disabled();
-        save_config(&cfg, save_path)?;
+        db.tls_save(&cfg)?;
         println!("Skipping — running without HTTPS.");
         return Ok(cfg);
     }
@@ -145,7 +134,7 @@ async fn run_wizard(config_dir: &str, save_path: &Path) -> Result<TlsConfig> {
         https_port,
     };
 
-    save_config(&cfg, save_path)?;
+    db.tls_save(&cfg)?;
 
     println!();
     println!("✓ Certificate obtained for {}!", domain);
@@ -256,13 +245,6 @@ fn setup_renewal_hook(domain: &str, config_dir: &str) {
     }
     tracing::info!("Renewal hook written to {}", hook_path);
     let _ = domain; // suppress unused warning
-}
-
-// ── Persist ───────────────────────────────────────────────────────────────
-
-fn save_config(cfg: &TlsConfig, path: &Path) -> Result<()> {
-    let json = serde_json::to_string_pretty(cfg)?;
-    std::fs::write(path, json).with_context(|| format!("saving {:?}", path))
 }
 
 // ── Prompt helpers ────────────────────────────────────────────────────────
