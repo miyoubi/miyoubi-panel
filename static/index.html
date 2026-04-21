@@ -1414,6 +1414,8 @@ async function loadServers() {
   } catch(e) { servers = []; }
   renderServerSidebar();
   renderDashServerList();
+  // Fetch running status for all servers immediately so sidebar dots are correct
+  refreshAllDots();
   if (servers.length === 0) {
     showWizard();
   } else {
@@ -1424,6 +1426,26 @@ async function loadServers() {
     // First server always has priority; URL path only wins if navigating to a different server
     selectServer(found && targetId !== servers[0].id ? targetId : servers[0].id);
   }
+}
+
+// Fetch /api/dashboard to update all sidebar dots at once.
+// Called after loadServers() and on the same 15s refresh cycle.
+async function refreshAllDots() {
+  try {
+    var r = await fetch('/api/dashboard');
+    if (!r.ok) return;
+    var d = await r.json();
+    if (d.servers) {
+      d.servers.forEach(function(ds) {
+        // Update servers[] running field for use by other code
+        var srv = servers.find(function(s) { return s.id === ds.id; });
+        if (srv) { srv.running = ds.running; srv.uptime = ds.uptime; }
+        // Update the dot
+        var dot = document.getElementById('srv-dot-' + ds.id);
+        if (dot) dot.className = 'srv-list-dot' + (ds.running ? ' on' : '');
+      });
+    }
+  } catch(e) {}
 }
 
 function renderServerSidebar() {
@@ -1689,6 +1711,9 @@ function applyStatus(s) {
   document.getElementById('btn-stop').disabled = !r;
   document.getElementById('btn-restart').disabled = !r;
   setConsoleInputEnabled(r);
+  // Keep the sidebar dot in sync for the currently selected server
+  var dot = document.getElementById('srv-dot-' + currentServerId);
+  if (dot) dot.className = 'srv-list-dot' + (r ? ' on' : '');
 }
 
 function checkAndClearConsole(s) {
