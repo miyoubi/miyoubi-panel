@@ -457,7 +457,29 @@ body {
     </div>
   </div>
 
-  <!-- ── VIEW: Console ── -->\n  <div class=\"view\" id=\"view-console\" style=\"display:none;flex-direction:column\">\n    <div class=\"srv-strip\" id=\"m-con-strip\"></div>\n    <div style=\"padding-top:10px;flex:1;display:flex;flex-direction:column;min-height:0\">\n      <div class=\"console-hdr\">\n        <div class=\"console-lbl-row\">\n          <span class=\"console-lbl\">Console</span>\n          <span class=\"live-badge\" id=\"m-con-badge\">connecting</span>\n        </div>\n        <button class=\"console-clear\" onclick=\"clearMLog()\">Clear</button>\n      </div>\n      <div class=\"console-out\" id=\"m-console\"></div>\n      <div class=\"cmd-row\">\n        <div class=\"cmd-prompt\">$</div>\n        <input class=\"cmd-input\" id=\"m-cmd\" type=\"text\" placeholder=\"Enter command...\"\n               autocomplete=\"off\" autocorrect=\"off\" autocapitalize=\"off\" spellcheck=\"false\"\n               disabled onkeydown=\"if(event.key==='Enter')mSendCmd()\">\n        <button class=\"cmd-send\" onclick=\"mSendCmd()\">\n          <svg width=\"13\" height=\"13\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"><line x1=\"22\" y1=\"2\" x2=\"11\" y2=\"13\"/><polygon points=\"22 2 15 22 11 13 2 9 22 2\"/></svg>\n        </button>\n      </div>\n    </div>\n  </div>
+  <!-- ── VIEW: Console ── -->
+  <div class="view" id="view-console" style="flex-direction:column">
+    <div class="srv-strip" id="m-con-strip"></div>
+    <div style="padding-top:10px;flex:1;display:flex;flex-direction:column;min-height:0">
+      <div class="console-hdr">
+        <div class="console-lbl-row">
+          <span class="console-lbl">Console</span>
+          <span class="live-badge" id="m-con-badge">connecting</span>
+        </div>
+        <button class="console-clear" onclick="clearMLog()">Clear</button>
+      </div>
+      <div class="console-out" id="m-console"></div>
+      <div class="cmd-row">
+        <div class="cmd-prompt">$</div>
+        <input class="cmd-input" id="m-cmd" type="text" placeholder="Enter command..."
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+               disabled onkeydown="if(event.key==='Enter')mSendCmd()">
+        <button class="cmd-send" onclick="mSendCmd()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
 
 </div><!-- /.page-wrap -->
 
@@ -504,6 +526,12 @@ var dashTimer = null;
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 window.addEventListener('load', async function() {
+  // Redirect desktop browsers to the full panel dashboard
+  var ua = navigator.userAgent || '';
+  var isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua) ||
+    (navigator.maxTouchPoints > 1 && window.innerWidth < 768);
+  if (!isMobile) { window.location.replace('/dashboard'); return; }
+
   try {
     var r = await fetch('/api/auth/me');
     if (!r.ok) {
@@ -535,6 +563,8 @@ window.addEventListener('load', async function() {
         '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror="this.parentNode.textContent=\'⛰\'">';
     } catch(e) {}
   } catch(e) { window.location.replace('/login'); return; }
+  // Always start on dashboard
+  showView('dash');
   await loadServers();
   loadDashboard();
   setInterval(loadDashboard, 15000);
@@ -546,7 +576,7 @@ function showView(name) {
   document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
   document.getElementById('view-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
-  // Always scroll console to bottom when switching to it
+  // Always snap console to bottom when switching to it
   if (name === 'console') {
     var el = document.getElementById('m-console');
     if (el) requestAnimationFrame(function() { el.scrollTop = el.scrollHeight; });
@@ -561,10 +591,8 @@ async function loadServers() {
     servers = await r.json();
   }
   catch(e) { servers = []; }
-
-  // Ping all servers concurrently to get online status, then sort online-first
+  // Ping all servers concurrently, sort online-first
   await pingAllServers();
-
   renderSrvStrips();
   renderDashServerList();
   if (servers.length > 0 && !currentId) selectServer(servers[0].id);
@@ -583,11 +611,7 @@ async function pingAllServers() {
   results.forEach(function(res, i) {
     servers[i].running = res.status === 'fulfilled' ? !!(res.value && res.value.running) : false;
   });
-  // Sort: online servers first, preserve original order within each group
-  servers.sort(function(a, b) {
-    if (a.running === b.running) return 0;
-    return a.running ? -1 : 1;
-  });
+  servers.sort(function(a, b) { return a.running === b.running ? 0 : a.running ? -1 : 1; });
 }
 
 function renderSrvStrips() {
@@ -712,10 +736,8 @@ async function pollPlayers() {
       data.online.forEach(function(name) {
         var isBedrock = name.charAt(0) === '.';
         var displayName = isBedrock ? name.slice(1) : name;
-        var card = document.createElement('div');
-        card.className = 'player-card';
-        var av = document.createElement('div');
-        av.className = 'player-av';
+        var card = document.createElement('div'); card.className = 'player-card';
+        var av = document.createElement('div'); av.className = 'player-av';
         av.textContent = displayName.slice(0,2).toUpperCase();
         var info = document.createElement('div');
         info.style.cssText = 'min-width:0;flex:1;overflow:hidden';
@@ -724,33 +746,23 @@ async function pollPlayers() {
           '<div class="player-status-text">online</div>' +
           '<span class="player-type-badge ' + (isBedrock ? 'bedrock' : 'java') + '">' +
           (isBedrock ? 'Bedrock' : 'Java') + '</span>';
-        card.appendChild(av);
-        card.appendChild(info);
-        grid.appendChild(card);
-        if (isBedrock) {
-          loadBedrockHead(displayName, av);
-        } else {
-          loadJavaHead(displayName, av);
-        }
+        card.appendChild(av); card.appendChild(info); grid.appendChild(card);
+        if (isBedrock) loadBedrockHead(displayName, av);
+        else loadJavaHead(displayName, av);
       });
     }
   } catch(e) {}
   playerTimer = setTimeout(pollPlayers, 12000);
 }
 
-// ── Java head via Crafatar ────────────────────────────────────────────────
+// ── Java head via Minotar ────────────────────────────────────────────────
 function loadJavaHead(username, avEl) {
-  var img = new Image();
-  img.crossOrigin = 'anonymous';
+  var img = new Image(); img.crossOrigin = 'anonymous';
   img.onload = function() {
-    avEl.textContent = '';
-    avEl.style.padding = '0';
-    var canvas = document.createElement('canvas');
-    canvas.width = 34; canvas.height = 34;
-    var ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, 0, 0, 34, 34);
-    avEl.appendChild(canvas);
+    avEl.textContent = ''; avEl.style.padding = '0';
+    var canvas = document.createElement('canvas'); canvas.width = 34; canvas.height = 34;
+    var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, 34, 34); avEl.appendChild(canvas);
   };
   img.src = 'https://minotar.net/helm/' + encodeURIComponent(username) + '/34.png';
 }
@@ -762,13 +774,11 @@ async function loadBedrockHead(xboxName, avEl) {
   try {
     if (bedrockHeadCache[xboxName]) { renderSkinHead(bedrockHeadCache[xboxName], avEl, 34); return; }
     var xuidRes = await fetch('https://api.geysermc.org/v2/xbox/xuid/' + encodeURIComponent(xboxName));
-    if (!xuidRes.ok) throw new Error('XUID fail');
-    var xuidData = await xuidRes.json();
-    if (!xuidData.xuid) throw new Error('No XUID');
+    if (!xuidRes.ok) throw new Error();
+    var xuidData = await xuidRes.json(); if (!xuidData.xuid) throw new Error();
     var skinRes = await fetch('https://api.geysermc.org/v2/skin/' + xuidData.xuid);
-    if (!skinRes.ok) throw new Error('Skin fail');
-    var skinData = await skinRes.json();
-    if (!skinData.texture_id) throw new Error('No texture_id');
+    if (!skinRes.ok) throw new Error();
+    var skinData = await skinRes.json(); if (!skinData.texture_id) throw new Error();
     var textureUrl = 'https://textures.minecraft.net/texture/' + skinData.texture_id;
     bedrockHeadCache[xboxName] = textureUrl;
     renderSkinHead(textureUrl, avEl, 34);
@@ -776,32 +786,22 @@ async function loadBedrockHead(xboxName, avEl) {
 }
 
 function renderSkinHead(textureUrl, avEl, size) {
-  var img = new Image();
-  img.crossOrigin = 'anonymous';
+  var img = new Image(); img.crossOrigin = 'anonymous';
   img.onload = function() {
     try {
-      var sw = img.naturalWidth, scale = sw / 64;
-      var faceX = 8*scale, faceY = 8*scale, faceW = 8*scale, faceH = 8*scale;
-      var hatX  = 40*scale, hatY = 8*scale, hatW = 8*scale, hatH = 8*scale;
-      var canvas = document.createElement('canvas');
-      canvas.width = size; canvas.height = size;
-      var ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, faceX, faceY, faceW, faceH, 0, 0, size, size);
-      var sh = img.naturalHeight;
-      if (sh >= 32 * scale) {
-        var test = document.createElement('canvas');
-        test.width = hatW; test.height = hatH;
-        var tctx = test.getContext('2d');
-        tctx.drawImage(img, hatX, hatY, hatW, hatH, 0, 0, hatW, hatH);
-        var px = tctx.getImageData(0, 0, hatW, hatH).data;
-        var hasHat = false;
+      var sw = img.naturalWidth, sc = sw / 64;
+      var canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 8*sc, 8*sc, 8*sc, 8*sc, 0, 0, size, size);
+      if (img.naturalHeight >= 32*sc) {
+        var t = document.createElement('canvas'); t.width = 8*sc; t.height = 8*sc;
+        var tctx = t.getContext('2d');
+        tctx.drawImage(img, 40*sc, 8*sc, 8*sc, 8*sc, 0, 0, 8*sc, 8*sc);
+        var px = tctx.getImageData(0, 0, 8*sc, 8*sc).data, hasHat = false;
         for (var i = 3; i < px.length; i += 4) { if (px[i] > 10) { hasHat = true; break; } }
-        if (hasHat) ctx.drawImage(img, hatX, hatY, hatW, hatH, 0, 0, size, size);
+        if (hasHat) ctx.drawImage(img, 40*sc, 8*sc, 8*sc, 8*sc, 0, 0, size, size);
       }
-      avEl.textContent = '';
-      avEl.style.padding = '0';
-      avEl.appendChild(canvas);
+      avEl.textContent = ''; avEl.style.padding = '0'; avEl.appendChild(canvas);
     } catch(e) {}
   };
   img.src = textureUrl;
