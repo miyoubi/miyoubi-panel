@@ -177,7 +177,7 @@ body {
 .metric-bar-fill.danger { background: var(--red); }
 
 /* ── Control buttons ── */
-.ctrl-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; padding: 12px; }
+.ctrl-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 7px; padding: 12px; }
 .ctrl-btn {
   display: flex; align-items: center; justify-content: center; gap: 5px;
   padding: 9px 0; border-radius: 6px; border: 1px solid var(--border2);
@@ -442,6 +442,9 @@ body {
           <button class="ctrl-btn restart" id="m-btn-restart" onclick="mAction('restart')" disabled>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Restart
           </button>
+          <button class="ctrl-btn" onclick="copyShareLink()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share
+          </button>
         </div>
       </div>
     </div>
@@ -507,6 +510,9 @@ body {
       <div class="drawer-name" id="dr-name">Admin</div>
       <div class="drawer-role" id="dr-role">Administrator</div>
     </div>
+    <button class="drawer-btn" onclick="copyShareLink();closeDrawer()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share Server Status
+    </button>
     <button class="drawer-btn" onclick="closeDrawer()">Close</button>
     <button class="drawer-btn danger" onclick="doLogout()">Sign out</button>
   </div>
@@ -941,6 +947,16 @@ function renderDashServerList(srvList) {
 function goToServer(id) {
   selectServer(id);
   showView('server');
+}
+
+function copyShareLink() {
+  if (!currentId) { toast('No server selected', 'err'); return; }
+  var url = window.location.origin + '/s/' + currentId;
+  if (navigator.share) {
+    navigator.share({ title: 'Server Status', url: url }).catch(function() {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() { toast('Status link copied!', 'ok'); });
+  } else { prompt('Copy this link:', url); }
 }
 
 // ── Profile drawer ─────────────────────────────────────────────────────────

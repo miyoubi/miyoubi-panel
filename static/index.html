@@ -965,6 +965,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
                 <button class="d-act-btn restart" id="d-btn-restart" onclick="dashServerAction('restart')" disabled>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Restart
                 </button>
+                <button class="share-btn" onclick="dashCopyShareLink()">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                  Share
+                </button>
                 <a class="open-btn" id="open-server-link" href="/" onclick="openDetailInPanel(event)">Open in Panel ↗</a>
               </div>
             </div>
@@ -2469,6 +2473,14 @@ async function changeOwnPassword() {
 function copyShareLink() {
   if (!currentServerId) return;
   var url = window.location.origin + '/s/' + currentServerId;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function() { toast('Status link copied!', 'ok'); });
+  } else { prompt('Copy this link:', url); }
+}
+
+function dashCopyShareLink() {
+  if (!dashSelectedId) return;
+  var url = window.location.origin + '/s/' + dashSelectedId;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(url).then(function() { toast('Status link copied!', 'ok'); });
   } else { prompt('Copy this link:', url); }
