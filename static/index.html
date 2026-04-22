@@ -371,6 +371,46 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .player-badge.bedrock { background: rgba(106,171,207,.1); color: var(--blue); border: 1px solid rgba(106,171,207,.2); }
 .player-badge.java { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
 
+/* ── Activity log ── */
+.activity-entry {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 7px;
+  flex-shrink: 0; transition: border-color .12s;
+}
+.activity-entry:hover { border-color: var(--border2); }
+.activity-av {
+  width: 30px; height: 30px; border-radius: 5px; flex-shrink: 0;
+  background: var(--card2); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.6rem; color: var(--muted); font-family: var(--mono); overflow: hidden;
+}
+.activity-av canvas { width: 30px; height: 30px; display: block; image-rendering: pixelated; }
+.activity-icon {
+  width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 10px;
+}
+.activity-icon.join   { background: rgba(109,189,138,.12); }
+.activity-icon.leave  { background: rgba(212,99,90,.12); }
+.activity-icon.death  { background: rgba(212,164,90,.12); }
+.activity-body { flex: 1; min-width: 0; }
+.activity-name { font-size: 0.75rem; font-family: var(--mono); font-weight: 500; }
+.activity-msg  { font-size: 0.65rem; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-msg.death { color: var(--amber); }
+.activity-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+.activity-time { font-size: 0.58rem; color: var(--muted2); font-family: var(--mono); }
+.activity-badge {
+  font-size: 0.5rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; letter-spacing: .04em;
+}
+.activity-badge.join   { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
+.activity-badge.leave  { background: rgba(212,99,90,.1);   color: var(--red);   border: 1px solid rgba(212,99,90,.2); }
+.activity-badge.death  { background: rgba(212,164,90,.1);  color: var(--amber); border: 1px solid rgba(212,164,90,.2); }
+.activity-type-badge {
+  font-size: 0.5rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .03em;
+}
+.activity-type-badge.bedrock { background: rgba(106,171,207,.1); color: var(--blue); border: 1px solid rgba(106,171,207,.2); }
+.activity-type-badge.java    { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
+
 /* ── Files ── */
 .breadcrumb {
   display: flex; align-items: center; gap: 3px;
@@ -1089,6 +1129,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <button class="tab-btn" id="tab-overview" onclick="goTab('overview')">Overview</button>
         <button class="tab-btn active" id="tab-console" onclick="goTab('console')">Console</button>
         <button class="tab-btn" id="tab-players" onclick="goTab('players')">Players</button>
+        <button class="tab-btn" id="tab-activity" onclick="goTab('activity')">Activity</button>
         <button class="tab-btn" id="tab-files" onclick="goTab('files')">Files</button>
         <button class="tab-btn" id="tab-mods" onclick="goTab('mods')">Mods</button>
         <button class="tab-btn" id="tab-config" onclick="goTab('config')">Config</button>
@@ -1283,6 +1324,30 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <div style="flex:1;overflow-y:auto">
             <div id="player-list-empty" style="text-align:center;padding:48px 0;color:var(--muted2);font-size:0.76rem">No players online</div>
             <div id="player-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:7px"></div>
+          </div>
+        </div>
+
+        <!-- Activity log -->
+        <div class="tab-panel" id="panel-activity">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-size:0.78rem;font-weight:500">Player Activity</div>
+              <span style="font-size:0.58rem;color:var(--muted);background:var(--card2);border:1px solid var(--border2);padding:1px 6px;border-radius:3px;font-family:var(--mono)" id="activity-count">0 events</span>
+            </div>
+            <div style="display:flex;gap:5px;align-items:center">
+              <select id="activity-filter" class="con-btn" style="cursor:pointer;font-family:var(--font)" onchange="renderActivityLog()">
+                <option value="all">All events</option>
+                <option value="join">Joins</option>
+                <option value="leave">Leaves</option>
+                <option value="death">Deaths</option>
+              </select>
+              <button class="con-btn" onclick="clearActivityLog()">Clear</button>
+            </div>
+          </div>
+          <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px" id="activity-list">
+            <div style="text-align:center;padding:48px 0;color:var(--muted2);font-size:0.76rem" id="activity-empty">
+              No player activity yet — events are captured from console logs
+            </div>
           </div>
         </div>
 
@@ -1507,6 +1572,7 @@ function selectServer(id) {
   tabLoaded = {};
   settingsLoaded = false;
   lineCount = 0;
+  activityLog = [];
   document.getElementById('console').innerHTML = '';
   document.getElementById('line-count').textContent = '0 lines';
   document.querySelectorAll('.srv-list-item').forEach(function(el) { el.classList.remove('active'); });
@@ -1654,6 +1720,7 @@ function goTab(name) {
       }).catch(function(){});
     }
     if (name === 'config') fetchConfig();
+    if (name === 'activity') { renderActivityLog(); updateActivityCount(); }
   }
   if (name === 'settings' && !settingsLoaded) { settingsLoaded = true; loadSettings(); }
   if (name === 'config') fetchConfig();
@@ -1862,7 +1929,237 @@ function scheduleReplayFlush() {
   }, 150);
 }
 
+// ── Activity log ──────────────────────────────────────────────────────────
+var activityLog = [];   // { type, player, msg, time, isBedrock }
+var activityHeadCache = {};
+var ACTIVITY_MAX = 500;
+
+// Minecraft join/leave/death patterns from server logs
+// Log lines look like: [HH:MM:SS] [Server thread/INFO]: <player> joined the game
+// or the ISO timestamp variant stripped by makeLogDiv
+var DEATH_PATTERNS = [
+  'was slain by', 'was shot by', 'was pummeled by', 'was blown up by',
+  'was killed by', 'drowned', 'suffocated in a wall', 'experienced kinetic energy',
+  'fell from a high place', 'fell off', 'fell out of', 'fell into', 'fell while',
+  'burned to death', 'went up in flames', 'walked into fire', 'was struck by lightning',
+  'hit the ground too hard', 'tried to swim in lava', 'discovered the floor was lava',
+  'starved to death', 'was squished too much', 'was poked to death',
+  'was stung to death', 'was shot by a skull', 'was impaled by',
+  'went off with a bang', 'froze to death', 'died', 'was fireballed by',
+  'was obliterated by', 'withered away', 'was pricked to death'
+];
+
+function parseLogEvent(raw) {
+  // Strip ISO timestamp prefix if present
+  var line = raw.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s/, '');
+  // Extract the message part — strip log prefix like "[HH:MM:SS] [.../INFO]: "
+  var msgMatch = line.match(/\[[\d:]+\]\s*\[[^\]]+\]:\s*(.*)/);
+  var msg = msgMatch ? msgMatch[1].trim() : line.trim();
+
+  var now = new Date();
+  var timeStr = now.getHours().toString().padStart(2,'0') + ':' +
+                now.getMinutes().toString().padStart(2,'0') + ':' +
+                now.getSeconds().toString().padStart(2,'0');
+
+  // Join
+  var joinMatch = msg.match(/^([A-Za-z0-9_\.\-]+) joined the game$/);
+  if (joinMatch) {
+    var player = joinMatch[1];
+    return { type: 'join', player: player, msg: 'joined the game',
+             time: timeStr, isBedrock: player.charAt(0) === '.' };
+  }
+
+  // Leave
+  var leaveMatch = msg.match(/^([A-Za-z0-9_\.\-]+) left the game$/);
+  if (leaveMatch) {
+    var player = leaveMatch[1];
+    return { type: 'leave', player: player, msg: 'left the game',
+             time: timeStr, isBedrock: player.charAt(0) === '.' };
+  }
+
+  // Death — player name is always first token(s) before a known death phrase
+  var msgLo = msg.toLowerCase();
+  for (var i = 0; i < DEATH_PATTERNS.length; i++) {
+    var pat = DEATH_PATTERNS[i];
+    var idx = msgLo.indexOf(pat);
+    if (idx > 0) {
+      // The player name is everything before the pattern, trimmed
+      var player = msg.slice(0, idx).trim();
+      // Sanity check: player name should look reasonable (1-32 chars, valid chars)
+      if (player.length >= 1 && player.length <= 36 && /^[A-Za-z0-9_\.\-]+$/.test(player)) {
+        return { type: 'death', player: player, msg: msg,
+                 time: timeStr, isBedrock: player.charAt(0) === '.' };
+      }
+    }
+  }
+
+  return null;
+}
+
+function addActivityEvent(event) {
+  if (!event) return;
+  activityLog.push(event);
+  if (activityLog.length > ACTIVITY_MAX) activityLog.shift();
+  // Only re-render if activity tab is active
+  var panel = document.getElementById('panel-activity');
+  if (panel && panel.classList.contains('active')) {
+    appendActivityEntry(event);
+  }
+  // Update count badge regardless
+  updateActivityCount();
+}
+
+function updateActivityCount() {
+  var el = document.getElementById('activity-count');
+  if (el) el.textContent = activityLog.length + ' event' + (activityLog.length !== 1 ? 's' : '');
+}
+
+function renderActivityLog() {
+  var list = document.getElementById('activity-list');
+  var empty = document.getElementById('activity-empty');
+  var filter = (document.getElementById('activity-filter') || {}).value || 'all';
+  var filtered = filter === 'all' ? activityLog : activityLog.filter(function(e) { return e.type === filter; });
+  // Clear and re-render
+  list.innerHTML = '';
+  if (filtered.length === 0) {
+    var msg = filter === 'all' ? 'No player activity yet — events are captured from console logs'
+            : 'No ' + filter + ' events recorded yet';
+    list.innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--muted2);font-size:0.76rem">' + msg + '</div>';
+    return;
+  }
+  // Render newest-first
+  for (var i = filtered.length - 1; i >= 0; i--) {
+    list.appendChild(buildActivityEntry(filtered[i]));
+  }
+}
+
+function appendActivityEntry(event) {
+  var list = document.getElementById('activity-list');
+  var filter = (document.getElementById('activity-filter') || {}).value || 'all';
+  if (filter !== 'all' && filter !== event.type) return;
+  var empty = document.getElementById('activity-empty');
+  if (empty) empty.remove();
+  // Prepend (newest first)
+  list.insertBefore(buildActivityEntry(event), list.firstChild);
+}
+
+function buildActivityEntry(event) {
+  var isBedrock = event.isBedrock;
+  var displayName = isBedrock ? event.player.slice(1) : event.player;
+
+  var entry = document.createElement('div');
+  entry.className = 'activity-entry';
+
+  // Avatar
+  var av = document.createElement('div');
+  av.className = 'activity-av';
+  av.textContent = displayName.slice(0,2).toUpperCase();
+
+  // Event icon
+  var icon = document.createElement('div');
+  icon.className = 'activity-icon ' + event.type;
+  icon.textContent = event.type === 'join' ? '→' : event.type === 'leave' ? '←' : '☠';
+
+  // Body
+  var body = document.createElement('div');
+  body.className = 'activity-body';
+  var nameEl = document.createElement('div');
+  nameEl.className = 'activity-name';
+  nameEl.textContent = event.player;
+  var msgEl = document.createElement('div');
+  msgEl.className = 'activity-msg' + (event.type === 'death' ? ' death' : '');
+  msgEl.textContent = event.type === 'death' ? event.msg : event.msg;
+  msgEl.title = event.msg;
+  body.appendChild(nameEl);
+  body.appendChild(msgEl);
+
+  // Right side: time + event badge + platform badge
+  var right = document.createElement('div');
+  right.className = 'activity-right';
+  var timeEl = document.createElement('div');
+  timeEl.className = 'activity-time';
+  timeEl.textContent = event.time;
+  var evBadge = document.createElement('span');
+  evBadge.className = 'activity-badge ' + event.type;
+  evBadge.textContent = event.type === 'join' ? 'JOIN' : event.type === 'leave' ? 'LEAVE' : 'DEATH';
+  var typeBadge = document.createElement('span');
+  typeBadge.className = 'activity-type-badge ' + (isBedrock ? 'bedrock' : 'java');
+  typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+  right.appendChild(timeEl);
+  right.appendChild(evBadge);
+  right.appendChild(typeBadge);
+
+  entry.appendChild(av);
+  entry.appendChild(icon);
+  entry.appendChild(body);
+  entry.appendChild(right);
+
+  // Load head async
+  loadActivityHead(displayName, isBedrock, av);
+
+  return entry;
+}
+
+function loadActivityHead(username, isBedrock, avEl) {
+  var cacheKey = (isBedrock ? 'br:' : 'jv:') + username;
+  if (activityHeadCache[cacheKey]) {
+    renderActivityHeadFromUrl(activityHeadCache[cacheKey], avEl, isBedrock);
+    return;
+  }
+  if (isBedrock) {
+    fetch('https://api.geysermc.org/v2/xbox/xuid/' + encodeURIComponent(username))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(xd) { if (!xd || !xd.xuid) throw new Error(); return fetch('https://api.geysermc.org/v2/skin/' + xd.xuid); })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(sd) {
+        if (!sd || !sd.texture_id) throw new Error();
+        var url = 'https://textures.minecraft.net/texture/' + sd.texture_id;
+        activityHeadCache[cacheKey] = url;
+        renderActivityHeadFromUrl(url, avEl, true);
+      }).catch(function() {});
+  } else {
+    var url = 'https://minotar.net/helm/' + encodeURIComponent(username) + '/30.png';
+    activityHeadCache[cacheKey] = url;
+    renderActivityHeadFromUrl(url, avEl, false);
+  }
+}
+
+function renderActivityHeadFromUrl(url, avEl, isBedrock) {
+  var img = new Image(); img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    try {
+      var size = 30;
+      var canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+      var ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      if (isBedrock) {
+        var sw = img.naturalWidth, sc = sw / 64;
+        ctx.drawImage(img, 8*sc, 8*sc, 8*sc, 8*sc, 0, 0, size, size);
+        if (img.naturalHeight >= 32*sc) {
+          var t = document.createElement('canvas'); t.width = 8*sc; t.height = 8*sc;
+          var tctx = t.getContext('2d');
+          tctx.drawImage(img, 40*sc, 8*sc, 8*sc, 8*sc, 0, 0, 8*sc, 8*sc);
+          var px = tctx.getImageData(0, 0, 8*sc, 8*sc).data, hasHat = false;
+          for (var i = 3; i < px.length; i += 4) { if (px[i] > 10) { hasHat = true; break; } }
+          if (hasHat) ctx.drawImage(img, 40*sc, 8*sc, 8*sc, 8*sc, 0, 0, size, size);
+        }
+      } else {
+        ctx.drawImage(img, 0, 0, size, size);
+      }
+      avEl.textContent = ''; avEl.style.padding = '0'; avEl.appendChild(canvas);
+    } catch(e) {}
+  };
+  img.src = url;
+}
+
+function clearActivityLog() {
+  activityLog = [];
+  renderActivityLog();
+  updateActivityCount();
+}
+
 function makeLogDiv(raw) {
+  // Parse for player activity events on every incoming line
+  addActivityEvent(parseLogEvent(raw));
   var div = document.createElement('div');
   var lo = raw.toLowerCase();
   var cls = 'log-line';
