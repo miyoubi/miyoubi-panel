@@ -203,11 +203,12 @@ impl DockerClient {
                     let text = String::from_utf8_lossy(&message);
                     // Split on both \n and \r so terminal-overwrite lines
                     // (apt-get progress etc.) become separate entries.
-                    // push() will further sanitize and deduplicate.
+                    // push_history() sanitizes/deduplicates but skips activity
+                    // recording — these are historic lines already in the DB.
                     for line in text.split(|c| c == '\n' || c == '\r') {
                         let line = line.trim();
                         if !line.is_empty() && !is_rcon_noise(line) {
-                            lb.push(line.to_string(), "docker");
+                            lb.push_history(line.to_string(), "docker");
                         }
                     }
                 }

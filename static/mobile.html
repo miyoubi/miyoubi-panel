@@ -271,6 +271,40 @@ body {
 .player-type-badge.java { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
 .no-players { padding: 28px 14px; text-align: center; color: var(--muted2); font-size: 0.75rem; }
 
+/* ── Activity log ── */
+.act-entry {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; flex-shrink: 0;
+}
+.act-av {
+  width: 30px; height: 30px; border-radius: 5px; flex-shrink: 0;
+  background: var(--card2); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.58rem; color: var(--muted); font-family: var(--mono); overflow: hidden;
+}
+.act-av canvas { width: 30px; height: 30px; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+.act-icon {
+  width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 9px;
+}
+.act-icon.join  { background: rgba(109,189,138,.12); }
+.act-icon.leave { background: rgba(212,99,90,.12); }
+.act-icon.death { background: rgba(212,164,90,.12); }
+.act-body { flex: 1; min-width: 0; }
+.act-name { font-size: 0.72rem; font-family: var(--mono); font-weight: 500; }
+.act-msg  { font-size: 0.62rem; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.act-msg.death { color: var(--amber); }
+.act-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.act-time  { font-size: 0.55rem; color: var(--muted2); font-family: var(--mono); }
+.act-badge { font-size: 0.48rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .04em; }
+.act-badge.join  { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
+.act-badge.leave { background: rgba(212,99,90,.1);   color: var(--red);   border: 1px solid rgba(212,99,90,.2); }
+.act-badge.death { background: rgba(212,164,90,.1);  color: var(--amber); border: 1px solid rgba(212,164,90,.2); }
+.act-type { font-size: 0.48rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .03em; }
+.act-type.bedrock { background: rgba(106,171,207,.1); color: var(--blue);  border: 1px solid rgba(106,171,207,.2); }
+.act-type.java    { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
+
 /* ── Dashboard server list items ── */
 .db-srv-row {
   padding: 11px 14px; display: flex; align-items: center; gap: 11px;
@@ -484,6 +518,30 @@ body {
     </div>
   </div>
 
+  <!-- ── VIEW: Activity ── -->
+  <div class="view" id="view-activity">
+    <div class="section" style="padding-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <div style="font-size:0.72rem;font-weight:600">Player Activity</div>
+          <span style="font-size:0.55rem;color:var(--muted);background:var(--card2);border:1px solid var(--border2);padding:1px 5px;border-radius:3px;font-family:var(--mono)" id="m-act-count">0 events</span>
+        </div>
+        <div style="display:flex;gap:5px">
+          <select id="m-act-filter" style="background:var(--card2);border:1px solid var(--border2);color:var(--text);border-radius:5px;padding:4px 7px;font-size:0.65rem;font-family:var(--font);outline:none" onchange="mRenderActivity()">
+            <option value="all">All</option>
+            <option value="join">Joins</option>
+            <option value="leave">Leaves</option>
+            <option value="death">Deaths</option>
+          </select>
+          <button class="console-clear" style="border:1px solid var(--border2);border-radius:5px;padding:4px 9px;background:var(--card2)" onclick="mClearActivity()">Clear</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px" id="m-act-list">
+        <div id="m-act-empty" style="text-align:center;padding:40px 0;color:var(--muted2);font-size:0.74rem">No activity yet — captured from console logs</div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /.page-wrap -->
 
 <!-- Bottom nav -->
@@ -499,6 +557,10 @@ body {
   <button class="nav-tab" id="nav-console" onclick="showView('console')">
     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2zm9.5 5.5h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1zm-6.354-.354a.5.5 0 1 0 .708.708l2-2a.5.5 0 0 0 0-.708l-2-2a.5.5 0 1 0-.708.708L4.793 6.5z"/></svg>
     Console
+  </button>
+  <button class="nav-tab" id="nav-activity" onclick="showView('activity')">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1m0 13A6 6 0 1 1 8 2a6 6 0 0 1 0 12m.5-6.5V4.5a.5.5 0 0 0-1 0v3.207l-1.854 1.853a.5.5 0 0 0 .708.707L8.5 8.414V8.5z"/></svg>
+    Activity
   </button>
 </div>
 
@@ -587,6 +649,8 @@ function showView(name) {
     var el = document.getElementById('m-console');
     if (el) requestAnimationFrame(function() { el.scrollTop = el.scrollHeight; });
   }
+  // Render activity log when switching to it
+  if (name === 'activity') { mRenderActivity(); }
 }
 
 // ── Servers ────────────────────────────────────────────────────────────────
@@ -651,9 +715,11 @@ function selectServer(id) {
   // Reset metrics
   ['m-cpu','m-mem-val','m-pl-count'].forEach(function(id) { var el=document.getElementById(id); if(el) el.textContent='—'; });
   setMBar('m-cpu-bar', 0); setMBar('m-mem-val-bar', 0);
-  // Clear console
+  // Clear console + activity
   document.getElementById('m-console').innerHTML = '';
+  mClearActivity();
   pollStatus(); pollPlayers(); startConsoleStream();
+  mFetchActivityHistory(id);
 }
 
 // ── Status ─────────────────────────────────────────────────────────────────
@@ -813,6 +879,197 @@ function renderSkinHead(textureUrl, avEl, size) {
   img.src = textureUrl;
 }
 
+// ── Activity log ──────────────────────────────────────────────────────────
+var mActivityLog = [];
+var mActivityHeadCache = {};
+var M_ACTIVITY_MAX = 300;
+
+var M_DEATH_PATTERNS = [
+  'was slain by','was shot by','was pummeled by','was blown up by','was killed by',
+  'drowned','suffocated in a wall','experienced kinetic energy','fell from a high place',
+  'fell off','fell out of','fell into','fell while','burned to death','went up in flames',
+  'walked into fire','was struck by lightning','hit the ground too hard',
+  'tried to swim in lava','discovered the floor was lava','starved to death',
+  'was squished too much','was poked to death','was stung to death',
+  'was shot by a skull','was impaled by','went off with a bang','froze to death',
+  'died','was fireballed by','was obliterated by','withered away','was pricked to death'
+];
+
+function mParseLogEvent(raw) {
+  var line = raw.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s/, '');
+  var msgMatch = line.match(/\[([\d:]+)\]\s*\[[^\]]+\]:\s*(.*)/);
+  var msg = msgMatch ? msgMatch[2].trim() : line.trim();
+  var timeStr = msgMatch ? msgMatch[1] : (function() {
+    var n = new Date();
+    return n.getHours().toString().padStart(2,'0') + ':' +
+           n.getMinutes().toString().padStart(2,'0') + ':' +
+           n.getSeconds().toString().padStart(2,'0');
+  })();
+
+  var joinMatch = msg.match(/^([A-Za-z0-9_.\-]+) joined the game$/);
+  if (joinMatch) {
+    var p = joinMatch[1];
+    return { type:'join', player:p, msg:'joined the game', time:timeStr, isBedrock:p.charAt(0)==='.' };
+  }
+  var leaveMatch = msg.match(/^([A-Za-z0-9_.\-]+) left the game$/);
+  if (leaveMatch) {
+    var p = leaveMatch[1];
+    return { type:'leave', player:p, msg:'left the game', time:timeStr, isBedrock:p.charAt(0)==='.' };
+  }
+  var msgLo = msg.toLowerCase();
+  for (var i = 0; i < M_DEATH_PATTERNS.length; i++) {
+    var idx = msgLo.indexOf(M_DEATH_PATTERNS[i]);
+    if (idx > 0) {
+      var p = msg.slice(0, idx).trim();
+      if (p.length >= 1 && p.length <= 36 && /^[A-Za-z0-9_.\-]+$/.test(p)) {
+        return { type:'death', player:p, msg:msg, time:timeStr, isBedrock:p.charAt(0)==='.' };
+      }
+    }
+  }
+  return null;
+}
+
+function mAddActivity(event) {
+  if (!event) return;
+  mActivityLog.push(event);
+  if (mActivityLog.length > M_ACTIVITY_MAX) mActivityLog.shift();
+  var actView = document.getElementById('view-activity');
+  if (actView && actView.classList.contains('active')) {
+    mPrependActivityEntry(event);
+  }
+  var countEl = document.getElementById('m-act-count');
+  if (countEl) countEl.textContent = mActivityLog.length + ' event' + (mActivityLog.length !== 1 ? 's' : '');
+}
+
+function mRenderActivity() {
+  var list = document.getElementById('m-act-list');
+  if (!list) return;
+  var filter = (document.getElementById('m-act-filter') || {}).value || 'all';
+  var filtered = filter === 'all' ? mActivityLog : mActivityLog.filter(function(e) { return e.type === filter; });
+  list.innerHTML = '';
+  if (!filtered.length) {
+    list.innerHTML = '<div id="m-act-empty" style="text-align:center;padding:40px 0;color:var(--muted2);font-size:0.74rem">No ' + (filter === 'all' ? '' : filter + ' ') + 'activity yet</div>';
+    return;
+  }
+  for (var i = filtered.length - 1; i >= 0; i--) {
+    list.appendChild(mBuildEntry(filtered[i]));
+  }
+  var countEl = document.getElementById('m-act-count');
+  if (countEl) countEl.textContent = mActivityLog.length + ' event' + (mActivityLog.length !== 1 ? 's' : '');
+}
+
+function mPrependActivityEntry(event) {
+  var list = document.getElementById('m-act-list');
+  if (!list) return;
+  var filter = (document.getElementById('m-act-filter') || {}).value || 'all';
+  if (filter !== 'all' && filter !== event.type) return;
+  var empty = document.getElementById('m-act-empty');
+  if (empty) empty.remove();
+  list.insertBefore(mBuildEntry(event), list.firstChild);
+  var countEl = document.getElementById('m-act-count');
+  if (countEl) countEl.textContent = mActivityLog.length + ' event' + (mActivityLog.length !== 1 ? 's' : '');
+}
+
+function mBuildEntry(event) {
+  var isBedrock = event.isBedrock;
+  var displayName = isBedrock ? event.player.slice(1) : event.player;
+  var entry = document.createElement('div'); entry.className = 'act-entry';
+  var av = document.createElement('div'); av.className = 'act-av';
+  av.textContent = displayName.slice(0,2).toUpperCase();
+  var icon = document.createElement('div'); icon.className = 'act-icon ' + event.type;
+  icon.textContent = event.type === 'join' ? '→' : event.type === 'leave' ? '←' : '☠';
+  var body = document.createElement('div'); body.className = 'act-body';
+  var nameEl = document.createElement('div'); nameEl.className = 'act-name'; nameEl.textContent = event.player;
+  var msgEl = document.createElement('div'); msgEl.className = 'act-msg' + (event.type === 'death' ? ' death' : '');
+  msgEl.textContent = event.msg; msgEl.title = event.msg;
+  body.appendChild(nameEl); body.appendChild(msgEl);
+  var right = document.createElement('div'); right.className = 'act-right';
+  var timeEl = document.createElement('div'); timeEl.className = 'act-time'; timeEl.textContent = event.time;
+  var evBadge = document.createElement('span'); evBadge.className = 'act-badge ' + event.type;
+  evBadge.textContent = event.type === 'join' ? 'JOIN' : event.type === 'leave' ? 'LEAVE' : 'DEATH';
+  var typeBadge = document.createElement('span'); typeBadge.className = 'act-type ' + (isBedrock ? 'bedrock' : 'java');
+  typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+  right.appendChild(timeEl); right.appendChild(evBadge); right.appendChild(typeBadge);
+  entry.appendChild(av); entry.appendChild(icon); entry.appendChild(body); entry.appendChild(right);
+  mLoadActivityHead(displayName, isBedrock, av);
+  return entry;
+}
+
+function mLoadActivityHead(username, isBedrock, avEl) {
+  var key = (isBedrock ? 'br:' : 'jv:') + username;
+  if (mActivityHeadCache[key]) { mDrawHead(mActivityHeadCache[key], avEl, isBedrock); return; }
+  if (isBedrock) {
+    fetch('https://api.geysermc.org/v2/xbox/xuid/' + encodeURIComponent(username))
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(xd) { if (!xd || !xd.xuid) throw new Error(); return fetch('https://api.geysermc.org/v2/skin/' + xd.xuid); })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(sd) {
+        if (!sd || !sd.texture_id) throw new Error();
+        var url = 'https://textures.minecraft.net/texture/' + sd.texture_id;
+        mActivityHeadCache[key] = url; mDrawHead(url, avEl, true);
+      }).catch(function() {});
+  } else {
+    var url = 'https://minotar.net/helm/' + encodeURIComponent(username) + '/30.png';
+    mActivityHeadCache[key] = url; mDrawHead(url, avEl, false);
+  }
+}
+
+function mDrawHead(url, avEl, isBedrock) {
+  var img = new Image(); img.crossOrigin = 'anonymous';
+  img.onload = function() {
+    try {
+      var size = 30;
+      var c = document.createElement('canvas'); c.width = size; c.height = size;
+      var ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      if (isBedrock) {
+        var sw = img.naturalWidth, sc = sw/64;
+        ctx.drawImage(img, 8*sc,8*sc,8*sc,8*sc, 0,0,size,size);
+        if (img.naturalHeight >= 32*sc) {
+          var t = document.createElement('canvas'); t.width=8*sc; t.height=8*sc;
+          var tctx=t.getContext('2d'); tctx.drawImage(img,40*sc,8*sc,8*sc,8*sc,0,0,8*sc,8*sc);
+          var px=tctx.getImageData(0,0,8*sc,8*sc).data, hasHat=false;
+          for(var i=3;i<px.length;i+=4){if(px[i]>10){hasHat=true;break;}}
+          if(hasHat) ctx.drawImage(img,40*sc,8*sc,8*sc,8*sc,0,0,size,size);
+        }
+      } else { ctx.drawImage(img,0,0,size,size); }
+      avEl.textContent=''; avEl.style.padding='0'; avEl.appendChild(c);
+    } catch(e) {}
+  };
+  img.src = url;
+}
+
+function mClearActivity() {
+  mActivityLog = [];
+  var list = document.getElementById('m-act-list');
+  if (list) list.innerHTML = '<div id="m-act-empty" style="text-align:center;padding:40px 0;color:var(--muted2);font-size:0.74rem">No activity yet — captured from console logs</div>';
+  var countEl = document.getElementById('m-act-count');
+  if (countEl) countEl.textContent = '0 events';
+}
+
+async function mFetchActivityHistory(serverId) {
+  try {
+    var res = await fetch(API + '/api/servers/' + serverId + '/activity?limit=500');
+    if (!res.ok) return;
+    var rows = await res.json();
+    // rows: [{ ts, event, player, detail }] — oldest first
+    rows.forEach(function(row) {
+      var d = new Date(row.ts);
+      var timeStr = d.getHours().toString().padStart(2,'0') + ':' +
+                    d.getMinutes().toString().padStart(2,'0') + ':' +
+                    d.getSeconds().toString().padStart(2,'0');
+      mActivityLog.push({
+        type:      row.event,
+        player:    row.player,
+        msg:       row.detail || (row.event === 'join' ? 'joined the game' : row.event === 'leave' ? 'left the game' : 'died'),
+        time:      timeStr,
+        isBedrock: row.player.charAt(0) === '.'
+      });
+    });
+    if (mActivityLog.length > M_ACTIVITY_MAX) mActivityLog = mActivityLog.slice(-M_ACTIVITY_MAX);
+    mRenderActivity();
+  } catch(e) {}
+}
+
 // ── Console SSE ────────────────────────────────────────────────────────────
 function startConsoleStream() {
   if (sseSource) { sseSource.close(); sseSource = null; }
@@ -852,6 +1109,7 @@ function startConsoleStream() {
 }
 
 function mkLine(raw) {
+  mAddActivity(mParseLogEvent(raw));
   var div = document.createElement('div');
   var lo  = raw.toLowerCase();
   var cls = 'log-line';

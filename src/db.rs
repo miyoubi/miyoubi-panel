@@ -80,6 +80,23 @@ impl Db {
             );
             CREATE INDEX IF NOT EXISTS idx_console_log_server
                 ON console_log (server_id, id);
+
+            -- ── Player activity log ───────────────────────────────────────
+            -- Persistent log of player join / leave / death events.
+            -- `event` is one of: 'join', 'leave', 'death'.
+            -- `player` is the player name.
+            -- `detail` holds extra context (e.g. the death message) or NULL.
+            -- `ts` is Unix milliseconds.
+            CREATE TABLE IF NOT EXISTS player_activity (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                server_id TEXT    NOT NULL,
+                ts        INTEGER NOT NULL,
+                event     TEXT    NOT NULL,
+                player    TEXT    NOT NULL,
+                detail    TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_player_activity_server
+                ON player_activity (server_id, id);
         ")?;
         Ok(())
     }
@@ -236,4 +253,77 @@ impl Db {
         )?;
         Ok(())
     }
+
+    // ── Player activity helpers ────────────────────────────────────────────
+
+    /// Maximum activity rows kept per server.
+    pub const MAX_ACTIVITY_ROWS: usize = 5000;
+
+    /// Record a player join, leave, or death event.
+    pub fn activity_append(
+        &self,
+        server_id: &str,
+        event: &str,
+        player: &str,
+        detail: Option<&str>,
+    ) -> Result<()> {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO player_activity (server_id, ts, event, player, detail)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![server_id, now_ms, event, player, detail],
+        )?;
+        // Prune oldest rows beyond the cap.
+        conn.execute(
+            "DELETE FROM player_activity
+             WHERE server_id = ?1
+               AND id NOT IN (
+                 SELECT id FROM player_activity
+                 WHERE server_id = ?1
+                 ORDER BY id DESC LIMIT ?2
+               )",
+            params![server_id, Self::MAX_ACTIVITY_ROWS as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Load the last `limit` activity rows for a server (oldest first).
+    pub fn activity_load(
+        &self,
+        server_id: &str,
+        limit: usize,
+    ) -> Result<Vec<PlayerActivityRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT ts, event, player, detail FROM (
+                SELECT id, ts, event, player, detail
+                FROM player_activity
+                WHERE server_id = ?1
+                ORDER BY id DESC LIMIT ?2
+             ) ORDER BY id ASC",
+        )?;
+        let rows = stmt.query_map(params![server_id, limit as i64], |r| {
+            Ok(PlayerActivityRow {
+                ts:     r.get(0)?,
+                event:  r.get(1)?,
+                player: r.get(2)?,
+                detail: r.get(3)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+    }
+}
+
+// ── Public types ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PlayerActivityRow {
+    pub ts:     i64,
+    pub event:  String,
+    pub player: String,
+    pub detail: Option<String>,
 }

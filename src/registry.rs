@@ -180,12 +180,21 @@ impl ServerRegistry {
                         tokio::time::sleep(Duration::from_secs(2)).await;
                         continue;
                     } else {
-                        tracing::warn!(
-                            "[{}] Log stream error: {} — retrying in 5s",
-                            inst.def.name, e
-                        );
-                        // Don't replay — if start/restart cleared the buffer,
-                        // replaying would bring stale lines back.
+                        // Unknown error from attach. Before warning, check whether
+                        // the container is actually running — if it's offline there's
+                        // no point attaching and we should wait quietly.
+                        let is_running = inst.docker.get_status().await.running;
+                        if is_running {
+                            tracing::warn!(
+                                "[{}] Log stream error: {} — retrying in 5s",
+                                inst.def.name, e
+                            );
+                        } else {
+                            tracing::debug!(
+                                "[{}] Log stream error while container offline, waiting: {}",
+                                inst.def.name, e
+                            );
+                        }
                         tail = "0";
                     }
                 }
@@ -590,6 +599,7 @@ fn extract_env(compose: &str, key: &str) -> Option<String> {
 }
 
 /// Legacy: kept for compatibility, calls regenerate_compose_for_def.
+#[allow(dead_code)]
 pub fn regenerate_compose(def: &ServerDef) -> Result<()> {
     let current = std::fs::read_to_string(&def.compose_file).unwrap_or_default();
     if current.contains("AUTOPAUSE_ENABLED") {

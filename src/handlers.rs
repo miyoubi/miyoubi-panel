@@ -25,7 +25,6 @@ use anyhow::Context as AnyhowContext;
 pub struct AppState {
     pub registry: Arc<ServerRegistry>,
     pub users:    crate::users::UserStore,
-    pub db:       crate::db::Db,
 }
 
 // ── Error handling ────────────────────────────────────────────────────────
@@ -69,17 +68,8 @@ pub async fn serve_login()     -> Html<&'static str> { Html(LOGIN_HTML) }
 pub async fn serve_viewer()    -> Html<&'static str> { Html(VIEWER_HTML) }
 pub async fn serve_mobile() -> Html<&'static str> { Html(MOBILE_HTML) }
 
-pub async fn serve_dashboard(
-    headers: axum::http::HeaderMap,
-) -> Html<&'static str> {
-    // Serve the mobile UI when the client is a phone or narrow-screen device
-    let ua = headers
-        .get(axum::http::header::USER_AGENT)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-    let is_mobile = ua.contains("Mobile") || ua.contains("Android")
-        || ua.contains("iPhone") || ua.contains("iPad");
-    if is_mobile { Html(MOBILE_HTML) } else { Html(INDEX_HTML) }
+pub async fn serve_dashboard() -> impl axum::response::IntoResponse {
+    axum::response::Redirect::to("/mobile")
 }
 pub async fn serve_setup()     -> Html<&'static str> { Html(SETUP_HTML) }
 
@@ -311,6 +301,22 @@ pub async fn players(
     let inst = get_server!(s, id);
     let pl = docker_call(inst.docker.get_players()).await??;
     Ok(Json(pl))
+}
+
+// GET /api/servers/:id/activity?limit=N
+#[derive(Deserialize)]
+pub struct ActivityQuery { pub limit: Option<usize> }
+
+pub async fn activity_log(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<ActivityQuery>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id);
+    let limit = q.limit.unwrap_or(200).min(5000);
+    let rows = inst.log_buffer.db_ref().activity_load(&id, limit)
+        .context("loading player activity")?;
+    Ok(Json(rows))
 }
 
 // ── File browser ──────────────────────────────────────────────────────────

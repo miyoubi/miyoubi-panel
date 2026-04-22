@@ -1585,6 +1585,7 @@ function selectServer(id) {
     var connAddr = document.getElementById('conn-addr');
     if (connAddr) connAddr.textContent = window.location.hostname + ':' + s.port;
   }
+  fetchActivityHistory(id);
   fetchStatus();
   startLogStream();
   fetchPlayers();
@@ -1953,13 +1954,15 @@ function parseLogEvent(raw) {
   // Strip ISO timestamp prefix if present
   var line = raw.replace(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s/, '');
   // Extract the message part — strip log prefix like "[HH:MM:SS] [.../INFO]: "
-  var msgMatch = line.match(/\[[\d:]+\]\s*\[[^\]]+\]:\s*(.*)/);
-  var msg = msgMatch ? msgMatch[1].trim() : line.trim();
-
-  var now = new Date();
-  var timeStr = now.getHours().toString().padStart(2,'0') + ':' +
-                now.getMinutes().toString().padStart(2,'0') + ':' +
-                now.getSeconds().toString().padStart(2,'0');
+  var msgMatch = line.match(/\[([\d:]+)\]\s*\[[^\]]+\]:\s*(.*)/);
+  var msg = msgMatch ? msgMatch[2].trim() : line.trim();
+  // Use timestamp from the log line itself, fall back to wall clock
+  var timeStr = msgMatch ? msgMatch[1] : (function() {
+    var now = new Date();
+    return now.getHours().toString().padStart(2,'0') + ':' +
+           now.getMinutes().toString().padStart(2,'0') + ':' +
+           now.getSeconds().toString().padStart(2,'0');
+  })();
 
   // Join
   var joinMatch = msg.match(/^([A-Za-z0-9_\.\-]+) joined the game$/);
@@ -1998,6 +2001,14 @@ function parseLogEvent(raw) {
 
 function addActivityEvent(event) {
   if (!event) return;
+  // Dedup: if the last few entries already have the same type+player+time
+  // (can happen when SSE replays lines that were already loaded from the DB),
+  // silently drop it.
+  var recent = activityLog.slice(-10);
+  var isDup = recent.some(function(e) {
+    return e.type === event.type && e.player === event.player && e.time === event.time;
+  });
+  if (isDup) return;
   activityLog.push(event);
   if (activityLog.length > ACTIVITY_MAX) activityLog.shift();
   // Only re-render if activity tab is active
@@ -2155,6 +2166,33 @@ function clearActivityLog() {
   activityLog = [];
   renderActivityLog();
   updateActivityCount();
+}
+
+// Load persisted activity from the backend DB and seed activityLog.
+// Called whenever a server is selected so history survives restarts.
+async function fetchActivityHistory(serverId) {
+  try {
+    var res = await fetch(API + '/api/servers/' + serverId + '/activity?limit=500');
+    if (!res.ok) return;
+    var rows = await res.json();
+    // rows: [{ ts, event, player, detail }] — oldest first
+    rows.forEach(function(row) {
+      var d = new Date(row.ts);
+      var timeStr = d.getHours().toString().padStart(2,'0') + ':' +
+                    d.getMinutes().toString().padStart(2,'0') + ':' +
+                    d.getSeconds().toString().padStart(2,'0');
+      activityLog.push({
+        type:      row.event,
+        player:    row.player,
+        msg:       row.detail || (row.event === 'join' ? 'joined the game' : row.event === 'leave' ? 'left the game' : 'died'),
+        time:      timeStr,
+        isBedrock: row.player.charAt(0) === '.'
+      });
+    });
+    if (activityLog.length > ACTIVITY_MAX) activityLog = activityLog.slice(-ACTIVITY_MAX);
+    renderActivityLog();
+    updateActivityCount();
+  } catch(e) {}
 }
 
 function makeLogDiv(raw) {

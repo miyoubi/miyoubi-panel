@@ -83,7 +83,7 @@ async fn main() {
     }
     info!("User store loaded ({} accounts)", users.list().len());
 
-    let state = AppState { registry, users, db: db.clone() };
+    let state = AppState { registry, users };
 
     // ── Build the main app router ─────────────────────────────────────────
     let app = build_router(state);
@@ -176,6 +176,7 @@ fn build_router(state: AppState) -> Router {
         .route("/api/servers/:id/logs/clear", post(handlers::logs_clear))
         .route("/api/servers/:id/command",  post(handlers::command))
         .route("/api/servers/:id/players",  get(handlers::players))
+        .route("/api/servers/:id/activity", get(handlers::activity_log))
         .route("/api/servers/:id/files",         get(handlers::files_dir))
         .route("/api/servers/:id/files/content",  get(handlers::file_content))
         .route("/api/servers/:id/files/write",    post(handlers::file_write))

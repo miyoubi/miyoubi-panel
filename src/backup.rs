@@ -167,16 +167,6 @@ pub fn list_backups(backup_dir: &str) -> Result<Vec<BackupFile>> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/// Derive the docker-compose service name for the MC server from its container name.
-/// Mirrors `sanitize()` in registry.rs — compose service names must be lowercase alphanumeric + hyphens.
-fn mc_svc_name(container_name: &str) -> String {
-    sanitize_svc(container_name)
-}
-
-fn backup_svc_name(container_name: &str) -> String {
-    sanitize_svc(container_name)
-}
-
 fn sanitize_svc(s: &str) -> String {
     s.chars()
         .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
