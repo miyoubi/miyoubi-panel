@@ -97,7 +97,33 @@ impl Db {
             );
             CREATE INDEX IF NOT EXISTS idx_player_activity_server
                 ON player_activity (server_id, id);
+
+            -- Player death log: one row per death, keyed by server+player.
+            CREATE TABLE IF NOT EXISTS player_deaths (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                server_id TEXT    NOT NULL,
+                ts        INTEGER NOT NULL,
+                player    TEXT    NOT NULL,
+                detail    TEXT    NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_player_deaths_server_player
+                ON player_deaths (server_id, player, id);
+
+            -- Global panel settings (key/value per username)
+            CREATE TABLE IF NOT EXISTS panel_settings (
+                username TEXT    NOT NULL,
+                key      TEXT    NOT NULL,
+                value    TEXT    NOT NULL,
+                PRIMARY KEY (username, key)
+            );
         ")?;
+        // Migrate: add dim/coords columns if they don't exist yet (idempotent).
+        // Use the conn guard already held above — re-locking the same Mutex
+        // from the same thread would deadlock since std::sync::Mutex is not reentrant.
+        for col in &["dim TEXT", "coords TEXT"] {
+            let sql = format!("ALTER TABLE player_deaths ADD COLUMN {}", col);
+            let _ = conn.execute(&sql, []);
+        }
         Ok(())
     }
 
@@ -316,6 +342,154 @@ impl Db {
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
     }
+
+    /// Delete all stored activity rows for a server.
+    pub fn activity_clear(&self, server_id: &str) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "DELETE FROM player_activity WHERE server_id = ?1",
+            params![server_id],
+        )?;
+        Ok(())
+    }
+
+    // ── Player death log helpers ───────────────────────────────────────────
+
+    /// Maximum death rows kept per server.
+    pub const MAX_DEATH_ROWS: usize = 10_000;
+
+    /// Record a single death event for a player.
+    pub fn death_log_append(
+        &self,
+        server_id: &str,
+        player: &str,
+        detail: &str,
+    ) -> Result<i64> {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO player_deaths (server_id, ts, player, detail) VALUES (?1, ?2, ?3, ?4)",
+            params![server_id, now_ms, player, detail],
+        )?;
+        let row_id = conn.last_insert_rowid();
+        // Prune oldest rows beyond cap.
+        conn.execute(
+            "DELETE FROM player_deaths
+             WHERE server_id = ?1
+               AND id NOT IN (
+                 SELECT id FROM player_deaths
+                 WHERE server_id = ?1
+                 ORDER BY id DESC LIMIT ?2
+               )",
+            params![server_id, Self::MAX_DEATH_ROWS as i64],
+        )?;
+        Ok(row_id)
+    }
+
+    /// Patch an existing death row with the coordinates/dimension fetched via RCON.
+    // ── Panel settings ───────────────────────────────────────────────────
+
+    pub fn settings_get(&self, username: &str, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT value FROM panel_settings WHERE username = ?1 AND key = ?2"
+        )?;
+        let mut rows = stmt.query(rusqlite::params![username, key])?;
+        Ok(rows.next()?.map(|r| r.get(0)).transpose()?)
+    }
+
+    pub fn settings_set(&self, username: &str, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO panel_settings (username, key, value) VALUES (?1, ?2, ?3)
+             ON CONFLICT(username, key) DO UPDATE SET value = excluded.value",
+            rusqlite::params![username, key, value],
+        )?;
+        Ok(())
+    }
+
+    pub fn death_log_update_coords(
+        &self,
+        server_id: &str,
+        row_id: i64,
+        dim: Option<&str>,
+        coords: Option<&str>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE player_deaths SET dim = ?1, coords = ?2
+             WHERE id = ?3 AND server_id = ?4",
+            params![dim, coords, row_id, server_id],
+        )?;
+        Ok(())
+    }
+
+    /// List all players that have at least one death for this server,
+    /// with their total death count and the timestamp of their last death.
+    /// Ordered by most recent death first.
+    pub fn death_log_players(&self, server_id: &str) -> Result<Vec<DeathPlayerRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT player, COUNT(*) as deaths, MAX(ts) as last_ts
+             FROM player_deaths
+             WHERE server_id = ?1
+             GROUP BY player
+             ORDER BY last_ts DESC",
+        )?;
+        let rows = stmt.query_map(params![server_id], |r| {
+            Ok(DeathPlayerRow {
+                player:  r.get(0)?,
+                deaths:  r.get(1)?,
+                last_ts: r.get(2)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+    }
+
+    /// Load all death events for a specific player on a server, newest first.
+    pub fn death_log_for_player(
+        &self,
+        server_id: &str,
+        player: &str,
+    ) -> Result<Vec<DeathEventRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT ts, detail, dim, coords FROM player_deaths
+             WHERE server_id = ?1 AND player = ?2
+             ORDER BY id DESC",
+        )?;
+        let rows = stmt.query_map(params![server_id, player], |r| {
+            Ok(DeathEventRow {
+                ts:     r.get(0)?,
+                detail: r.get(1)?,
+                dim:    r.get(2)?,
+                coords: r.get(3)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+    }
+
+    /// Load all villager death events for a server from player_activity,
+    /// newest first.
+    pub fn villager_deaths_load(&self, server_id: &str, limit: usize) -> Result<Vec<PlayerActivityRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT ts, event, player, detail FROM player_activity
+             WHERE server_id = ?1 AND event = 'villager_death'
+             ORDER BY id DESC LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![server_id, limit as i64], |r| {
+            Ok(PlayerActivityRow {
+                ts:     r.get(0)?,
+                event:  r.get(1)?,
+                player: r.get(2)?,
+                detail: r.get(3)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+    }
 }
 
 // ── Public types ──────────────────────────────────────────────────────────
@@ -326,4 +500,19 @@ pub struct PlayerActivityRow {
     pub event:  String,
     pub player: String,
     pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeathPlayerRow {
+    pub player:  String,
+    pub deaths:  i64,
+    pub last_ts: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DeathEventRow {
+    pub ts:     i64,
+    pub detail: String,
+    pub dim:    Option<String>,
+    pub coords: Option<String>,
 }

@@ -1,8 +1,10 @@
 //! User account management — backed by SQLite via `crate::db::Db`.
 //!
-//! Two roles:
-//!   - Admin  : full access
-//!   - Viewer : read-only status, players, Start/Stop/Restart only
+//! Three roles:
+//!   - Admin    : full access — create/delete servers, manage users
+//!   - Operator : manage assigned servers — start/stop/restart, console,
+//!               files, mods, config, activity and death logs
+//!   - Viewer   : read-only — status, players, activity, death logs
 //!
 //! On first run the `users` table is empty. `needs_setup()` returns true
 //! and the panel serves the /setup wizard. Once the first admin is created,
@@ -21,14 +23,31 @@ use crate::db::Db;
 #[serde(rename_all = "lowercase")]
 pub enum UserRole {
     Admin,
+    Operator,
     Viewer,
+}
+
+impl UserRole {
+    /// Numeric weight — higher = more permissions.
+    pub fn level(&self) -> u8 {
+        match self {
+            UserRole::Admin    => 2,
+            UserRole::Operator => 1,
+            UserRole::Viewer   => 0,
+        }
+    }
+    /// True if self has at least the privileges of .
+    pub fn at_least(&self, min: &UserRole) -> bool {
+        self.level() >= min.level()
+    }
 }
 
 impl std::fmt::Display for UserRole {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UserRole::Admin  => write!(f, "admin"),
-            UserRole::Viewer => write!(f, "viewer"),
+            UserRole::Admin    => write!(f, "admin"),
+            UserRole::Operator => write!(f, "operator"),
+            UserRole::Viewer   => write!(f, "viewer"),
         }
     }
 }
@@ -37,9 +56,10 @@ impl FromStr for UserRole {
     type Err = ();
     fn from_str(s: &str) -> std::result::Result<Self, ()> {
         match s {
-            "admin"  => Ok(UserRole::Admin),
-            "viewer" => Ok(UserRole::Viewer),
-            _        => Err(()),
+            "admin"    => Ok(UserRole::Admin),
+            "operator" => Ok(UserRole::Operator),
+            "viewer"   => Ok(UserRole::Viewer),
+            _           => Err(()),
         }
     }
 }

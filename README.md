@@ -1,6 +1,6 @@
 # Miyoubi Panel
 
-A self-hosted Minecraft server panel written in Rust.
+A self-hosted Minecraft server management panel written in Rust. Supports Java and Bedrock (via GeyserMC), runs entirely on Docker Compose, and persists all data in SQLite.
 
 ---
 
@@ -10,14 +10,14 @@ A self-hosted Minecraft server panel written in Rust.
 # Build
 cargo build --release
 
-# Allow binding to 80/443 without root (Linux)
+# Allow binding to port 80/443 without root (Linux)
 sudo setcap 'cap_net_bind_service=+ep' ./target/release/minecraft-panel
 
 # Run
 ./target/release/minecraft-panel
 ```
 
-First run will ask if you want HTTPS. Say yes and it runs certbot, grabs a Let's Encrypt cert for your domain, and saves it to `config/tls.json`. Run with `--reconfigure` if you need to redo the wizard later.
+First run opens an interactive wizard. If you choose HTTPS it runs certbot, obtains a Let's Encrypt cert for your domain, and writes it to `config/tls.json`. Re-run with `--reconfigure` to redo the wizard. The wizard also creates the first admin account.
 
 ---
 
@@ -25,45 +25,46 @@ First run will ask if you want HTTPS. Say yes and it runs certbot, grabs a Let's
 
 ### Environment variables
 
-| Variable      | Default                  | What it does                                   |
-|---------------|--------------------------|------------------------------------------------|
-| `PORT`        | `3000`                   | Port the panel listens on                      |
-| `BIND_ADDR`   | `127.0.0.1`              | Address to bind to                             |
-| `CONFIG_DIR`  | `config`                 | Root config directory                          |
-| `DOCKER_HOST` | `/var/run/docker.sock`   | Docker daemon socket                           |
+| Variable      | Default                | Description              |
+|---------------|------------------------|--------------------------|
+| `PORT`        | `3000`                 | HTTP port                |
+| `BIND_ADDR`   | `0.0.0.0`              | Address to bind to       |
+| `CONFIG_DIR`  | `config`               | Root config directory    |
+| `DOCKER_HOST` | `/var/run/docker.sock` | Docker daemon socket     |
 
 ### Config layout
 
 ```
 config/
-├── tls.json                   ← HTTPS config (created by first-run wizard)
-├── users.json                 ← User accounts
+├── tls.json                   ← HTTPS settings (created by wizard)
+├── panel.db                   ← SQLite database (users, logs, activity)
 └── servers/
-    └── myserver-a1b2c3d4/
-        ├── server.json        ← Server metadata (id, name, port, opencl...)
-        ├── docker-compose.yml ← Edit this directly if you want
-        ├── data/              ← Mounted into the container as /data
-        │   └── gpu.sh         ← Written automatically when OpenCL is enabled
-        ├── backups/           ← Backup archives (when backup sidecar is on)
-        └── console.log        ← Last 2000 lines of console output
+    └── my-server-a1b2c3d4/
+        ├── server.json        ← Server metadata (name, port, opencl…)
+        ├── docker-compose.yml ← Editable directly
+        └── data/              ← Mounted into the container as /data
+            └── gpu.sh         ← Written automatically when OpenCL is enabled
 ```
 
-Every `docker-compose.yml` is a normal standalone file. You can `cd` into the server directory and run `docker compose up -d` without touching the panel if you want.
+Every `docker-compose.yml` is standalone. You can `cd` into the server directory and run `docker compose up -d` without touching the panel.
 
 ---
 
 ## User roles
 
-| Role     | Access                                                         |
-|----------|----------------------------------------------------------------|
-| `admin`  | Everything — create/delete servers, files, mods, users         |
-| `viewer` | Read-only status and player info, plus Start/Stop/Restart      |
+Three roles. Assign them in **Settings → Users**.
 
-Manage users from the profile modal (click your name at the bottom of the sidebar). Admins see the full user list and can add/remove accounts. Everyone can change their own password from there too.
+| Role         | What they can do |
+|--------------|-----------------|
+| **Admin**    | Everything — create and delete servers, manage all users, change any setting |
+| **Operator** | Manage assigned servers — start/stop/restart, send console commands, browse and edit files, install/toggle mods, edit docker-compose config, manage backups. Cannot create/delete servers or manage users. |
+| **Viewer**   | Read-only — server status, online players, activity log, death logs. No console, no file access, no controls. |
+
+Admins and operators can be restricted to specific servers via the server-access checkboxes in the user list. Everyone can change their own password from the profile dropdown.
 
 ---
 
-## Systemd
+## Systemd service
 
 ```ini
 [Unit]
@@ -74,11 +75,11 @@ Requires=docker.service
 [Service]
 Type=simple
 User=exer
-WorkingDirectory=/home/exer/rust-panel
-ExecStart=/home/exer/rust-panel/target/release/minecraft-panel
+WorkingDirectory=/home/exer/minecraft-panel
+ExecStart=/home/exer/minecraft-panel/target/release/minecraft-panel
 Restart=on-failure
 RestartSec=5
-Environment=CONFIG_DIR=/home/exer/rust-panel/config
+Environment=CONFIG_DIR=/home/exer/minecraft-panel/config
 
 [Install]
 WantedBy=multi-user.target
@@ -92,109 +93,122 @@ sudo systemctl enable --now minecraft-panel
 
 ---
 
+## Features
+
+### Console & logs
+Real-time Docker log streaming via SSE. Last 2 000 lines stored in SQLite — survive panel restarts. Mobile pre-loads history via REST so the console is never blank on first open.
+
+### Activity log
+Join, leave, and death events parsed from the console and stored persistently. Visible in real time; survives server restarts and log clears. Bedrock players detected automatically via GeyserMC `.` prefix.
+
+### Death log
+Structured per-player death history with timestamps and cause. Named villager deaths captured separately with villager name, death message, dimension, and coordinates.
+
+### Mods
+Browse, enable, disable, and remove mods. Search Modrinth and install with one click — the panel downloads JARs server-side.
+
+### Backups
+Enable per server in **Settings → Backup**. Appends an `itzg/mc-backup` sidecar to the compose file. Server keeps running. Archives in `config/servers/<id>/backups/`.
+
+### OpenCL / GPU
+Enable in **Settings → Resources**. Writes `gpu.sh`, sets the compose entrypoint, adds the NVIDIA device block. Requires `nvidia-container-runtime`.
+
+### Public status pages
+Every server gets `/s/<server-id>` — no login required. Shows status, uptime, CPU, RAM, players (with platform badges and death counts). Auto-refreshes every 10 s.
+
+### Mobile UI
+Touch-optimised layout at `/mobile`. Role restrictions apply identically.
+
+---
+
 ## API
 
-All routes require an authenticated session cookie except the `/api/public` ones.
+All routes require an authenticated session cookie unless noted. Role requirements are enforced server-side — returns 403 if the caller lacks the required role.
 
 ### Auth
 
-| Method | Path               | Body                                    |
-|--------|--------------------|-----------------------------------------|
-| POST   | `/api/auth/login`  | `{ "username": "...", "password": "..." }` |
-| POST   | `/api/auth/logout` |                                         |
-| GET    | `/api/auth/me`     |                                         |
+| Method | Path               | Min role |
+|--------|--------------------|----------|
+| POST   | `/api/auth/login`  | —        |
+| POST   | `/api/auth/logout` | any      |
+| GET    | `/api/auth/me`     | any      |
 
 ### Servers
 
-| Method | Path                           | Notes                              |
-|--------|--------------------------------|------------------------------------|
-| GET    | `/api/servers`                 | List all                           |
-| POST   | `/api/servers`                 | Create                             |
-| DELETE | `/api/servers/:id`             | Delete server + all data           |
-| GET    | `/api/servers/:id/status`      | Fast status, no CPU/mem            |
-| GET    | `/api/servers/:id/stats`       | CPU + memory (~1s Docker call)     |
-| POST   | `/api/servers/:id/start`       |                                    |
-| POST   | `/api/servers/:id/stop`        |                                    |
-| POST   | `/api/servers/:id/restart`     |                                    |
-| GET    | `/api/servers/:id/logs`        | SSE stream                         |
-| POST   | `/api/servers/:id/command`     | RCON command                       |
-| GET    | `/api/servers/:id/players`     | Online players                     |
+| Method | Path                            | Min role |
+|--------|---------------------------------|----------|
+| GET    | `/api/servers`                  | viewer   |
+| POST   | `/api/servers`                  | admin    |
+| DELETE | `/api/servers/:id`              | admin    |
+| GET    | `/api/servers/:id/status`       | viewer   |
+| GET    | `/api/servers/:id/stats`        | viewer   |
+| POST   | `/api/servers/:id/start`        | operator |
+| POST   | `/api/servers/:id/stop`         | operator |
+| POST   | `/api/servers/:id/restart`      | operator |
+| GET    | `/api/servers/:id/logs`         | viewer   |
+| GET    | `/api/servers/:id/logs/history` | viewer   |
+| POST   | `/api/servers/:id/logs/clear`   | operator |
+| POST   | `/api/servers/:id/command`      | operator |
+| GET    | `/api/servers/:id/players`      | viewer   |
+
+### Activity & deaths
+
+| Method | Path                                | Min role |
+|--------|-------------------------------------|----------|
+| GET    | `/api/servers/:id/activity`         | viewer   |
+| POST   | `/api/servers/:id/activity/clear`   | operator |
+| GET    | `/api/servers/:id/deaths`           | viewer   |
+| GET    | `/api/servers/:id/deaths/villagers` | viewer   |
+| GET    | `/api/servers/:id/deaths/:player`   | viewer   |
 
 ### Files
 
-| Method | Path                                    |
-|--------|-----------------------------------------|
-| GET    | `/api/servers/:id/files?path=`          |
-| GET    | `/api/servers/:id/files/content?path=`  |
-| POST   | `/api/servers/:id/files/write`          |
+| Method | Path                                   | Min role |
+|--------|----------------------------------------|----------|
+| GET    | `/api/servers/:id/files?path=`         | operator |
+| GET    | `/api/servers/:id/files/content?path=` | operator |
+| POST   | `/api/servers/:id/files/write`         | operator |
 
 ### Mods
 
-| Method | Path                              |
-|--------|-----------------------------------|
-| GET    | `/api/servers/:id/mods`           |
-| POST   | `/api/servers/:id/mods/install`   |
-| POST   | `/api/servers/:id/mods/enable`    |
-| POST   | `/api/servers/:id/mods/disable`   |
-| POST   | `/api/servers/:id/mods/remove`    |
+| Method | Path                            | Min role |
+|--------|---------------------------------|----------|
+| GET    | `/api/servers/:id/mods`         | operator |
+| POST   | `/api/servers/:id/mods/install` | operator |
+| POST   | `/api/servers/:id/mods/enable`  | operator |
+| POST   | `/api/servers/:id/mods/disable` | operator |
+| POST   | `/api/servers/:id/mods/remove`  | operator |
 
 ### Config / Backup / OpenCL
 
-| Method | Path                          |
-|--------|-------------------------------|
-| GET    | `/api/servers/:id/config`     |
-| POST   | `/api/servers/:id/config`     |
-| GET    | `/api/servers/:id/backup`     |
-| POST   | `/api/servers/:id/backup`     |
-| POST   | `/api/servers/:id/opencl`     |
+| Method | Path                      | Min role |
+|--------|---------------------------|----------|
+| GET    | `/api/servers/:id/config` | operator |
+| POST   | `/api/servers/:id/config` | operator |
+| GET    | `/api/servers/:id/backup` | operator |
+| POST   | `/api/servers/:id/backup` | operator |
+| POST   | `/api/servers/:id/opencl` | operator |
 
-### Users (admin only except password change)
+### Users
 
-| Method | Path                                 |
-|--------|--------------------------------------|
-| GET    | `/api/users`                         |
-| POST   | `/api/users`                         |
-| PUT    | `/api/users/:username`               |
-| DELETE | `/api/users/:username`               |
-| POST   | `/api/users/:username/password`      |
-| PUT    | `/api/users/:username/servers`       |
+| Method | Path                            | Notes                               | Min role |
+|--------|---------------------------------|-------------------------------------|----------|
+| GET    | `/api/users`                    |                                     | admin    |
+| POST   | `/api/users`                    | role: admin \| operator \| viewer   | admin    |
+| PUT    | `/api/users/:username`          | Update role / password              | admin    |
+| DELETE | `/api/users/:username`          | Cannot delete last admin            | admin    |
+| POST   | `/api/users/:username/password` | Anyone can change own password      | any      |
+| PUT    | `/api/users/:username/servers`  | Set allowed server IDs              | admin    |
 
-### Public (no auth required)
+### Public (no auth)
 
-| Method | Path                      |
-|--------|---------------------------|
-| GET    | `/api/public/:id/status`  |
-| GET    | `/api/public/:id/stats`   |
-| GET    | `/api/public/:id/players` |
-| GET    | `/s/:id`                  |
-
----
-
-## OpenCL / GPU
-
-Enable per server in **Settings → Resources → GPU / OpenCL Support**, or tick the toggle in the creation wizard.
-
-When enabled, the panel:
-
-1. Writes `gpu.sh` into the server's `data/` folder — installs `ocl-icd-libopencl1` and sets up the NVIDIA OpenCL ICD
-2. Sets the compose entrypoint to `bash /data/gpu.sh && exec /start` (the `exec` makes Java PID 1, which is required for log capture to work)
-3. Adds `NVIDIA_VISIBLE_DEVICES: all` and the `deploy.resources.devices` block
-
-If you have `nvidia-container-runtime` installed you can also flip on `runtime: nvidia`. Without it, CDI/device-plugin mode works fine on most setups.
-
----
-
-## Backups
-
-Enable per server in **Settings → Backup**. The panel appends an `itzg/mc-backup` sidecar service to the server's `docker-compose.yml` and brings it up. The Minecraft server keeps running the whole time.
-
-Archives are written as `.tar.gz` to `config/servers/<n>/backups/`. You can configure the cron schedule, how many backups to keep, and the RCON password from the same settings panel.
-
----
-
-## Status pages
-
-Every server gets a public status page at `/s/<server-id>`. It shows online/offline state, uptime, CPU, memory and the player list, auto-refreshes every 10 seconds, and needs no login. Grab the link from the Share button in the server panel header.
+| Method | Path                      | Notes                    |
+|--------|---------------------------|--------------------------|
+| GET    | `/api/public/:id/status`  |                          |
+| GET    | `/api/public/:id/stats`   |                          |
+| GET    | `/api/public/:id/players` |                          |
+| GET    | `/api/public/:id/deaths`  | player → death count map |
+| GET    | `/s/:id`                  | Status page HTML         |
 
 ---
 

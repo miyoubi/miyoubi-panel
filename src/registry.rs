@@ -111,6 +111,8 @@ impl ServerRegistry {
         );
         // LogBuffer loads history from the DB automatically.
         let lb = Arc::new(LogBuffer::new(def.id.clone(), db));
+        // Give the buffer a handle to docker so it can query LastDeathLocation.
+        lb.set_docker(docker.clone());
         Ok(ServerInstance { def, docker, log_buffer: lb })
     }
 

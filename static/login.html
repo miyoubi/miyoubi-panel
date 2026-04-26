@@ -95,12 +95,29 @@ input::placeholder { color: var(--muted2); }
 /* Footer */
 .footer { font-size: 0.58rem; color: var(--muted2); text-align: center; margin-top: 16px; }
 </style>
+<script>
+// Apply theme instantly before first paint to avoid flash
+(function() {
+  var AP_THEMES = {
+    warm:     {'--bg':'#141210','--sb':'#1a1714','--card':'#1f1c19','--card2':'#252119','--card3':'#2a261f','--border':'#2e2922','--border2':'#362f26','--text':'#e8e2d9','--muted':'#7a6f62','--muted2':'#4a4238','--accent':'#c8b89a','--green':'#6dbd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#6aabcf'},
+    cool:     {'--bg':'#0f1218','--sb':'#141921','--card':'#1a2130','--card2':'#1f2838','--card3':'#243040','--border':'#263040','--border2':'#2e3a4e','--text':'#d8e4f0','--muted':'#5a7a96','--muted2':'#2e4460','--accent':'#7ab3d4','--green':'#5ec97a','--red':'#d46a5a','--amber':'#d4a45a','--blue':'#7ab3d4'},
+    forest:   {'--bg':'#0d1410','--sb':'#111a13','--card':'#162018','--card2':'#1a2820','--card3':'#1f3025','--border':'#233828','--border2':'#2a4230','--text':'#d8edd8','--muted':'#5a7a62','--muted2':'#2e4a38','--accent':'#7abd8a','--green':'#a8d47a','--red':'#d4635a','--amber':'#d4c45a','--blue':'#6aabcf'},
+    midnight: {'--bg':'#08080f','--sb':'#0d0d18','--card':'#121220','--card2':'#181828','--card3':'#1e1e32','--border':'#222235','--border2':'#2a2a42','--text':'#e0dff8','--muted':'#6a6a92','--muted2':'#3a3a58','--accent':'#9a8adf','--green':'#6dbd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#7a9adf'},
+    mocha:    {'--bg':'#1a1008','--sb':'#221508','--card':'#2a1c0e','--card2':'#322216','--card3':'#3a2a1e','--border':'#3e2e1e','--border2':'#4a3828','--text':'#f0e0c8','--muted':'#8a6a4a','--muted2':'#5a4030','--accent':'#d4a45a','--green':'#7abd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#6aabcf'}
+  };
+  try {
+    var id = localStorage.getItem('mcpanel_theme') || 'warm';
+    var theme = AP_THEMES[id] || AP_THEMES['warm'];
+    Object.keys(theme).forEach(function(k) { document.documentElement.style.setProperty(k, theme[k]); });
+  } catch(e) {}
+})();
+</script>
 </head>
 <body>
 <div class="shell">
   <div class="box">
     <div class="logo">
-      <div class="logo-icon">&#x26F0;</div>
+      <div class="logo-icon" id="login-logo-icon">&#x26F0;</div>
       <div class="logo-text">Miyoubi<span> Panel</span></div>
     </div>
     <div class="heading">Sign in</div>
@@ -146,6 +163,7 @@ async function login() {
     if (res.ok && data.ok) {
       var exp = new Date(Date.now() + 7 * 864e5).toUTCString();
       document.cookie = 'mcpanel_user=' + encodeURIComponent(u) + '; expires=' + exp + '; path=/; SameSite=Strict';
+      await fetchAppearanceAfterLogin();
       window.location.replace('/');
     } else if (data.setup_required) {
       window.location.replace('/setup');
@@ -161,6 +179,38 @@ async function login() {
   } finally {
     btn.disabled = false; btn.textContent = 'Sign in';
   }
+}
+</script>
+<script>
+// Apply login icon after DOM is ready (needs the element to exist)
+(function() {
+  function applyLoginIcon() {
+    try {
+      var loginIcon = localStorage.getItem('mcpanel_login_icon');
+      if (loginIcon) {
+        var el = document.getElementById('login-logo-icon');
+        if (el) el.innerHTML = '<img src="' + loginIcon + '" style="width:100%;height:100%;object-fit:cover;border-radius:4px" onerror="this.onerror=null;this.parentNode.textContent='\u26F0'">';
+      }
+    } catch(e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyLoginIcon);
+  } else {
+    applyLoginIcon();
+  }
+})();
+
+// After successful login, fetch appearance from DB and cache to localStorage
+// so the dashboard loads with the right theme instantly on next page.
+async function fetchAppearanceAfterLogin() {
+  try {
+    var r = await fetch('/api/settings/appearance');
+    if (!r.ok) return;
+    var d = await r.json();
+    if (d.theme)      localStorage.setItem('mcpanel_theme',      d.theme);
+    if (d.icon)       localStorage.setItem('mcpanel_icon',       d.icon);
+    if (d.login_icon) localStorage.setItem('mcpanel_login_icon', d.login_icon);
+  } catch(e) {}
 }
 </script>
 </body>

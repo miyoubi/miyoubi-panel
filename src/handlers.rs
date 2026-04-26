@@ -25,6 +25,7 @@ use anyhow::Context as AnyhowContext;
 pub struct AppState {
     pub registry: Arc<ServerRegistry>,
     pub users:    crate::users::UserStore,
+    pub db:       crate::db::Db,
 }
 
 // ── Error handling ────────────────────────────────────────────────────────
@@ -33,8 +34,14 @@ pub struct ApiError(anyhow::Error);
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let body = serde_json::json!({"ok": false, "message": self.0.to_string()});
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(body)).into_response()
+        let msg = self.0.to_string();
+        let status = if msg.starts_with("insufficient permissions") || msg == "not authenticated" {
+            StatusCode::FORBIDDEN
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        };
+        let body = serde_json::json!({"ok": false, "message": msg});
+        (status, Json(body)).into_response()
     }
 }
 
@@ -80,9 +87,11 @@ pub async fn servers_list(
     headers: HeaderMap,
 ) -> impl IntoResponse {
     let all = s.registry.list();
-    // If the caller is a viewer with a server allowlist, filter to only those servers.
+    // Non-admin users with an allowlist only see their permitted servers.
     if let Some(user) = cookie_user(&headers) {
-        if matches!(s.users.role_of(&user), Some(crate::users::UserRole::Viewer)) {
+        let role = s.users.role_of(&user);
+        let is_non_admin = matches!(role, Some(crate::users::UserRole::Viewer) | Some(crate::users::UserRole::Operator));
+        if is_non_admin {
             if let Some(allowed) = s.users.allowed_servers(&user) {
                 let filtered: Vec<_> = all.into_iter()
                     .filter(|srv| allowed.contains(&srv.id))
@@ -96,8 +105,10 @@ pub async fn servers_list(
 
 pub async fn servers_create(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<CreateRequest>,
 ) -> ApiResult<impl IntoResponse> {
+    require_role(&s, &headers, UserRole::Admin)?;
     let start_now = req.start_now.unwrap_or(false);
     let def = s.registry.create(req).await?;
 
@@ -115,19 +126,50 @@ pub async fn servers_create(
 
 pub async fn servers_delete(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
+    require_role(&s, &headers, UserRole::Admin)?;
     s.registry.delete(&id)?;
     Ok(Json(serde_json::json!({"ok": true, "message": "server deleted"})))
 }
 
 // ── Per-server helper ─────────────────────────────────────────────────────
 
+/// Returns true if the authenticated user is allowed to access the given server.
+/// Admins always pass. Non-admins with no allowlist pass. Non-admins with an
+/// allowlist only pass if `server_id` is in their list.
+fn user_can_access_server(s: &AppState, headers: &HeaderMap, server_id: &str) -> bool {
+    let Some(user) = cookie_user(headers) else { return false; };
+    let role = s.users.role_of(&user);
+    // Admins have unrestricted access.
+    if matches!(role, Some(crate::users::UserRole::Admin)) {
+        return true;
+    }
+    // Non-admins: if they have an allowlist, the server must be in it.
+    match s.users.allowed_servers(&user) {
+        None => true, // no restriction set — allow all
+        Some(allowed) => allowed.contains(&server_id.to_string()),
+    }
+}
+
 macro_rules! get_server {
     ($state:expr, $id:expr) => {
         match $state.registry.get(&$id) {
             Some(inst) => inst,
             None => return Err(ApiError(anyhow::anyhow!("server not found"))),
+        }
+    };
+    // Variant that also enforces per-user server access restrictions.
+    ($state:expr, $id:expr, $headers:expr) => {
+        {
+            if !user_can_access_server(&$state, &$headers, &$id) {
+                return Err(ApiError(anyhow::anyhow!("server not found")));
+            }
+            match $state.registry.get(&$id) {
+                Some(inst) => inst,
+                None => return Err(ApiError(anyhow::anyhow!("server not found"))),
+            }
         }
     };
 }
@@ -140,9 +182,10 @@ macro_rules! get_server {
 
 pub async fn status(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let st = docker_call(inst.docker.get_status()).await?;
     Ok(Json(st))
 }
@@ -151,9 +194,10 @@ pub async fn status(
 /// Frontend calls this separately after confirming the server is running.
 pub async fn stats(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     // We need the real container ID, not the name, for stats
     let st = docker_call(inst.docker.get_status()).await?;
     if !st.running || st.container_id.is_empty() {
@@ -181,9 +225,11 @@ pub async fn stats(
 
 pub async fn start(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     ServerRegistry::compose_up(&inst).await?;
     inst.log_buffer.clear();
     inst.log_buffer.push("[panel] Server starting...".into(), "panel");
@@ -192,9 +238,11 @@ pub async fn start(
 
 pub async fn stop(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     ServerRegistry::compose_stop(&inst).await?;
     inst.log_buffer.push("[panel] Server stopping...".into(), "panel");
     Ok(Json(serde_json::json!({"ok": true, "message": "server stopping"})))
@@ -202,9 +250,11 @@ pub async fn stop(
 
 pub async fn restart(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     ServerRegistry::compose_restart(&inst).await?;
     inst.log_buffer.clear();
     inst.log_buffer.push("[panel] Server restarting...".into(), "panel");
@@ -220,8 +270,8 @@ pub async fn logs_clear(
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    if cookie_user(&headers).is_none() {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"ok": false}))).into_response();
+    if require_role(&s, &headers, UserRole::Operator).is_err() {
+        return (StatusCode::FORBIDDEN, Json(serde_json::json!({"ok": false, "message": "insufficient permissions"}))).into_response();
     }
     let inst = match s.registry.get(&id) {
         Some(i) => i,
@@ -233,9 +283,10 @@ pub async fn logs_clear(
 
 pub async fn stream_logs(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<Sse<impl futures_util::Stream<Item = Result<Event, Infallible>>>> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
 
     // Subscribe before snapshot to close the race window.
     let mut rx = inst.log_buffer.subscribe();
@@ -268,6 +319,25 @@ pub async fn stream_logs(
     ))
 }
 
+// GET /api/servers/:id/logs/history?limit=N  — REST snapshot of stored log lines.
+// Used by the mobile client to reliably load console history from the DB
+// without depending on SSE replay timing.
+#[derive(Deserialize)]
+pub struct LogHistoryQuery { pub limit: Option<usize> }
+
+pub async fn logs_history(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Query(q): Query<LogHistoryQuery>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id, headers);
+    let limit = q.limit.unwrap_or(500).min(2000);
+    let lines = inst.log_buffer.db_ref().log_load(&id, limit)
+        .context("loading log history")?;
+    Ok(Json(lines))
+}
+
 // ── Command ───────────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
@@ -275,13 +345,15 @@ pub struct CommandBody { pub command: String }
 
 pub async fn command(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<CommandBody>,
 ) -> ApiResult<impl IntoResponse> {
+    require_role(&s, &headers, UserRole::Operator)?;
     if body.command.is_empty() {
         return Err(ApiError(anyhow::anyhow!("command must not be empty")));
     }
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let output = docker_call(inst.docker.send_command(&body.command)).await??;
     for line in output.lines() {
         let line = line.trim();
@@ -296,9 +368,10 @@ pub async fn command(
 
 pub async fn players(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let pl = docker_call(inst.docker.get_players()).await??;
     Ok(Json(pl))
 }
@@ -309,13 +382,64 @@ pub struct ActivityQuery { pub limit: Option<usize> }
 
 pub async fn activity_log(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Query(q): Query<ActivityQuery>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let limit = q.limit.unwrap_or(200).min(5000);
     let rows = inst.log_buffer.db_ref().activity_load(&id, limit)
         .context("loading player activity")?;
+    Ok(Json(rows))
+}
+
+// POST /api/servers/:id/activity/clear
+pub async fn activity_clear(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id, headers);
+    inst.log_buffer.db_ref().activity_clear(&id)
+        .context("clearing player activity")?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+// ── Death log ─────────────────────────────────────────────────────────────
+
+// GET /api/servers/:id/deaths — list all players with death counts + last death ts
+pub async fn death_log_players(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id, headers);
+    let rows = inst.log_buffer.db_ref().death_log_players(&id)
+        .context("loading death log players")?;
+    Ok(Json(rows))
+}
+
+// GET /api/servers/:id/deaths/:player — all deaths for one player, newest first
+pub async fn death_log_for_player(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path((id, player)): Path<(String, String)>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id, headers);
+    let rows = inst.log_buffer.db_ref().death_log_for_player(&id, &player)
+        .context("loading player deaths")?;
+    Ok(Json(rows))
+}
+
+// GET /api/servers/:id/deaths/villagers — all villager deaths, newest first
+pub async fn villager_death_log(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id, headers);
+    let rows = inst.log_buffer.db_ref().villager_deaths_load(&id, 1000)
+        .context("loading villager deaths")?;
     Ok(Json(rows))
 }
 
@@ -326,10 +450,11 @@ pub struct PathQuery { pub path: Option<String> }
 
 pub async fn files_dir(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let req = q.path.unwrap_or_else(|| "/data".to_string());
     let real = files::map_data_path(&req, &inst.def.data_path);
     let safe = files::safe_path(&inst.def.data_path, &real)?;
@@ -338,10 +463,11 @@ pub async fn files_dir(
 
 pub async fn file_content(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Query(q): Query<PathQuery>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let req = q.path.unwrap_or_default();
     let real = files::map_data_path(&req, &inst.def.data_path);
     let safe = files::safe_path(&inst.def.data_path, &real)?;
@@ -353,10 +479,12 @@ pub struct FileWriteBody { pub path: String, pub content: String }
 
 pub async fn file_write(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<FileWriteBody>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     let real = files::map_data_path(&body.path, &inst.def.data_path);
     let safe = files::safe_path(&inst.def.data_path, &real)?;
     files::write_file(&safe, &body.content)?;
@@ -367,9 +495,10 @@ pub async fn file_write(
 
 pub async fn mods(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    let inst = get_server!(s, id, headers);
     let mods_path = format!("{}/mods", inst.def.data_path);
     Ok(Json(files::list_dir(&mods_path)?))
 }
@@ -379,10 +508,12 @@ pub struct ModPathBody { pub path: String }
 
 pub async fn mod_enable(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<ModPathBody>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     let mod_path = files::map_data_path(&body.path, &inst.def.data_path);
     let file_name = std::path::Path::new(&mod_path)
         .file_name()
@@ -394,10 +525,12 @@ pub async fn mod_enable(
 
 pub async fn mod_disable(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<ModPathBody>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     let mod_path = files::map_data_path(&body.path, &inst.def.data_path);
     files::disable_mod(&mod_path, &inst.def.data_path)?;
     Ok(Json(serde_json::json!({"ok": true, "message": "mod disabled"})))
@@ -405,10 +538,12 @@ pub async fn mod_disable(
 
 pub async fn mod_remove(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<ModPathBody>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
     let mod_path = files::map_data_path(&body.path, &inst.def.data_path);
     std::fs::remove_file(&mod_path)?;
     Ok(Json(serde_json::json!({"ok": true, "message": "mod removed"})))
@@ -431,10 +566,12 @@ pub struct ModInstallBody {
 /// this avoids CORS issues and keeps all file I/O on the server side.
 pub async fn mod_install(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<ModInstallBody>,
 ) -> ApiResult<impl IntoResponse> {
-    let inst = get_server!(s, id);
+    require_role(&s, &headers, UserRole::Operator)?;
+    let inst = get_server!(s, id, headers);
 
     // Validate filename — must end in .jar and contain no path separators.
     let fname = body.filename.trim();
@@ -483,8 +620,10 @@ pub async fn mod_install(
 
 pub async fn config_get(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
+    if !user_can_access_server(&s, &headers, &id) { return Err(ApiError(anyhow::anyhow!("server not found"))); }
     let content = s.registry.compose_read(&id)?;
     Ok(Json(serde_json::json!({"filename": "docker-compose.yml", "content": content})))
 }
@@ -494,9 +633,11 @@ pub struct ConfigBody { pub content: String }
 
 pub async fn config_set(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<ConfigBody>,
 ) -> ApiResult<impl IntoResponse> {
+    require_role(&s, &headers, UserRole::Operator)?;
     s.registry.compose_write(&id, &body.content)?;
     Ok(Json(serde_json::json!({"ok": true, "message": "saved docker-compose.yml"})))
 }
@@ -514,9 +655,11 @@ pub struct OpenClBody {
 /// The server must be stopped and `docker compose up -d` re-run to apply.
 pub async fn set_opencl(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(body): Json<OpenClBody>,
 ) -> ApiResult<impl IntoResponse> {
+    require_role(&s, &headers, UserRole::Operator)?;
     s.registry.set_opencl(&id, body.enabled)?;
     Ok(Json(serde_json::json!({
         "ok": true,
@@ -534,8 +677,10 @@ pub async fn set_opencl(
 /// Returns current backup config + list of existing backup files.
 pub async fn backup_get(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult<impl IntoResponse> {
+    if !user_can_access_server(&s, &headers, &id) { return Err(ApiError(anyhow::anyhow!("server not found"))); }
     let cfg = s.registry.get_backup_config(&id)?;
     let files = list_backups(&cfg.backup_dir).unwrap_or_default();
     Ok(Json(serde_json::json!({
@@ -549,9 +694,11 @@ pub async fn backup_get(
 /// The Minecraft server keeps running; only the sidecar is affected.
 pub async fn backup_set(
     State(s): State<AppState>,
+    headers: HeaderMap,
     Path(id): Path<String>,
     Json(cfg): Json<BackupConfig>,
 ) -> ApiResult<impl IntoResponse> {
+    require_role(&s, &headers, UserRole::Operator)?;
     let enabled = cfg.enabled;
     s.registry.set_backup(&id, cfg)?;
 
@@ -606,6 +753,50 @@ pub fn cookie_user(headers: &HeaderMap) -> Option<String> {
 }
 
 // POST /api/auth/login  { username, password }
+// ── Appearance settings ──────────────────────────────────────────────────
+
+// GET /api/settings/appearance — returns saved appearance JSON for the current user
+pub async fn appearance_get(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let user = match cookie_user(&headers) {
+        Some(u) => u,
+        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"ok":false}))).into_response(),
+    };
+    let theme = s.db.settings_get(&user, "theme").unwrap_or(None).unwrap_or_default();
+    let icon  = s.db.settings_get(&user, "icon").unwrap_or(None).unwrap_or_default();
+    let login_icon = s.db.settings_get(&user, "login_icon").unwrap_or(None).unwrap_or_default();
+    Json(serde_json::json!({
+        "ok": true,
+        "theme":      theme,
+        "icon":       icon,
+        "login_icon": login_icon,
+    })).into_response()
+}
+
+// POST /api/settings/appearance — saves appearance settings for the current user
+pub async fn appearance_set(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let user = match cookie_user(&headers) {
+        Some(u) => u,
+        None => return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"ok":false}))).into_response(),
+    };
+    if let Some(v) = body.get("theme").and_then(|v| v.as_str()) {
+        let _ = s.db.settings_set(&user, "theme", v);
+    }
+    if let Some(v) = body.get("icon").and_then(|v| v.as_str()) {
+        let _ = s.db.settings_set(&user, "icon", v);
+    }
+    if let Some(v) = body.get("login_icon").and_then(|v| v.as_str()) {
+        let _ = s.db.settings_set(&user, "login_icon", v);
+    }
+    Json(serde_json::json!({"ok": true})).into_response()
+}
+
 // Sets an HttpOnly session cookie on success — the browser stores it
 // automatically and it cannot be read by JavaScript.
 pub async fn auth_login(
@@ -711,8 +902,9 @@ pub async fn users_create(
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({"ok":false,"message":"Forbidden"}))).into_response();
     }
     let role = match body.role.as_str() {
-        "viewer" => UserRole::Viewer,
-        _ => UserRole::Admin,
+        "viewer"   => UserRole::Viewer,
+        "operator" => UserRole::Operator,
+        _          => UserRole::Admin,
     };
     match s.users.create(&body.username, &body.password, role) {
         Ok(()) => Json(serde_json::json!({"ok": true})).into_response(),
@@ -737,8 +929,9 @@ pub async fn users_update(
         return (StatusCode::FORBIDDEN, Json(serde_json::json!({"ok":false,"message":"Forbidden"}))).into_response();
     }
     let role = body.role.as_deref().and_then(|r| match r {
-        "viewer" => Some(UserRole::Viewer),
-        "admin" => Some(UserRole::Admin),
+        "viewer"   => Some(UserRole::Viewer),
+        "operator" => Some(UserRole::Operator),
+        "admin"    => Some(UserRole::Admin),
         _ => None,
     });
     match s.users.update(&username, body.password.as_deref(), role) {
@@ -1000,11 +1193,28 @@ pub async fn setup_create(
 }
 
 
+fn caller_role(s: &AppState, headers: &HeaderMap) -> Option<UserRole> {
+    cookie_user(headers).and_then(|u| s.users.role_of(&u))
+}
+
 fn is_admin(s: &AppState, headers: &HeaderMap) -> bool {
-    cookie_user(headers)
-        .and_then(|u| s.users.role_of(&u))
+    caller_role(s, headers)
         .map(|r| r == UserRole::Admin)
         .unwrap_or(false)
+}
+
+/// Returns `Err(403)` if the caller's role is below `min`.
+fn require_role(s: &AppState, headers: &HeaderMap, min: UserRole) -> Result<UserRole, ApiError> {
+    let role = caller_role(s, headers)
+        .ok_or_else(|| ApiError(anyhow::anyhow!("not authenticated")))?;
+    if role.at_least(&min) {
+        Ok(role)
+    } else {
+        Err(ApiError(anyhow::anyhow!(
+            "insufficient permissions — {} required, you are {}",
+            min, role
+        )))
+    }
 }
 
 // ── Public status page ────────────────────────────────────────────────────
@@ -1071,4 +1281,20 @@ pub async fn public_players(
     let inst = get_server!(s, id);
     let pl = docker_call(inst.docker.get_players()).await??;
     Ok(Json(pl))
+}
+
+// GET /api/public/:id/deaths — death counts for all players (public, no auth)
+pub async fn public_death_counts(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<impl IntoResponse> {
+    let inst = get_server!(s, id);
+    let rows = inst.log_buffer.db_ref().death_log_players(&id)
+        .context("loading public death counts")?;
+    // Return a simple map of player -> death count
+    let map: std::collections::HashMap<String, i64> = rows
+        .into_iter()
+        .map(|r| (r.player, r.deaths))
+        .collect();
+    Ok(Json(map))
 }

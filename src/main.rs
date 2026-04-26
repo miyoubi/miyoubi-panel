@@ -83,7 +83,7 @@ async fn main() {
     }
     info!("User store loaded ({} accounts)", users.list().len());
 
-    let state = AppState { registry, users };
+    let state = AppState { registry, users, db: db.clone() };
 
     // ── Build the main app router ─────────────────────────────────────────
     let app = build_router(state);
@@ -172,11 +172,16 @@ fn build_router(state: AppState) -> Router {
         .route("/api/servers/:id/start",    post(handlers::start))
         .route("/api/servers/:id/stop",     post(handlers::stop))
         .route("/api/servers/:id/restart",  post(handlers::restart))
-        .route("/api/servers/:id/logs",       get(handlers::stream_logs))
-        .route("/api/servers/:id/logs/clear", post(handlers::logs_clear))
+        .route("/api/servers/:id/logs",         get(handlers::stream_logs))
+        .route("/api/servers/:id/logs/history", get(handlers::logs_history))
+        .route("/api/servers/:id/logs/clear",   post(handlers::logs_clear))
         .route("/api/servers/:id/command",  post(handlers::command))
         .route("/api/servers/:id/players",  get(handlers::players))
         .route("/api/servers/:id/activity", get(handlers::activity_log))
+        .route("/api/servers/:id/activity/clear", post(handlers::activity_clear))
+        .route("/api/servers/:id/deaths",             get(handlers::death_log_players))
+        .route("/api/servers/:id/deaths/villagers",   get(handlers::villager_death_log))
+        .route("/api/servers/:id/deaths/:player",     get(handlers::death_log_for_player))
         .route("/api/servers/:id/files",         get(handlers::files_dir))
         .route("/api/servers/:id/files/content",  get(handlers::file_content))
         .route("/api/servers/:id/files/write",    post(handlers::file_write))
@@ -191,6 +196,7 @@ fn build_router(state: AppState) -> Router {
         .route("/favicon.ico",              get(serve_favicon))
         .route("/favicon.png",              get(serve_favicon))
         // ── Auth ─────────────────────────────────────────────────────────
+        .route("/api/settings/appearance",    get(handlers::appearance_get).post(handlers::appearance_set))
         .route("/api/auth/login",           post(handlers::auth_login))
         .route("/api/auth/logout",          post(handlers::auth_logout))
         .route("/api/auth/me",             get(handlers::auth_me))
@@ -204,6 +210,7 @@ fn build_router(state: AppState) -> Router {
         .route("/api/public/:id/status",   get(handlers::public_status))
         .route("/api/public/:id/stats",    get(handlers::public_stats))
         .route("/api/public/:id/players",  get(handlers::public_players))
+        .route("/api/public/:id/deaths",   get(handlers::public_death_counts))
         .route("/s/:id",                   get(handlers::serve_status_page))
         // ── Frontend ──────────────────────────────────────────────────────
         .route("/login",                    get(handlers::serve_login))

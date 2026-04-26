@@ -121,6 +121,7 @@ body {
 .player-type.bedrock { background: rgba(106,171,207,.1); color: var(--blue);  border: 1px solid rgba(106,171,207,.2); }
 .player-type.java    { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
 .no-players { font-size: 0.72rem; color: var(--muted2); padding: 4px 0; }
+.player-deaths { font-size: 0.5rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .03em; display: inline-block; background: rgba(212,99,90,.1); color: var(--red, #d4635a); border: 1px solid rgba(212,99,90,.2); margin-top: 1px; }
 
 .footer { display: flex; align-items: center; justify-content: space-between; padding: 0 2px; margin-top: 4px; }
 .footer-text { font-size: 0.58rem; color: var(--muted2); }
@@ -130,6 +131,21 @@ body {
 @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .wrap { animation: fadeUp .28s ease both; }
 </style>
+<script>
+(function() {
+  var AP_THEMES = {
+    warm:     {'--bg':'#141210','--sb':'#1a1714','--card':'#1f1c19','--card2':'#252119','--card3':'#2a261f','--border':'#2e2922','--border2':'#362f26','--text':'#e8e2d9','--muted':'#7a6f62','--muted2':'#4a4238','--accent':'#c8b89a','--green':'#6dbd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#6aabcf'},
+    cool:     {'--bg':'#0f1218','--sb':'#141921','--card':'#1a2130','--card2':'#1f2838','--card3':'#243040','--border':'#263040','--border2':'#2e3a4e','--text':'#d8e4f0','--muted':'#5a7a96','--muted2':'#2e4460','--accent':'#7ab3d4','--green':'#5ec97a','--red':'#d46a5a','--amber':'#d4a45a','--blue':'#7ab3d4'},
+    forest:   {'--bg':'#0d1410','--sb':'#111a13','--card':'#162018','--card2':'#1a2820','--card3':'#1f3025','--border':'#233828','--border2':'#2a4230','--text':'#d8edd8','--muted':'#5a7a62','--muted2':'#2e4a38','--accent':'#7abd8a','--green':'#a8d47a','--red':'#d4635a','--amber':'#d4c45a','--blue':'#6aabcf'},
+    midnight: {'--bg':'#08080f','--sb':'#0d0d18','--card':'#121220','--card2':'#181828','--card3':'#1e1e32','--border':'#222235','--border2':'#2a2a42','--text':'#e0dff8','--muted':'#6a6a92','--muted2':'#3a3a58','--accent':'#9a8adf','--green':'#6dbd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#7a9adf'},
+    mocha:    {'--bg':'#1a1008','--sb':'#221508','--card':'#2a1c0e','--card2':'#322216','--card3':'#3a2a1e','--border':'#3e2e1e','--border2':'#4a3828','--text':'#f0e0c8','--muted':'#8a6a4a','--muted2':'#5a4030','--accent':'#d4a45a','--green':'#7abd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#6aabcf'}
+  };
+  try {
+    var t = AP_THEMES[localStorage.getItem('mcpanel_theme') || 'warm'];
+    if (t) Object.keys(t).forEach(function(k) { document.documentElement.style.setProperty(k, t[k]); });
+  } catch(e) {}
+})();
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -263,16 +279,31 @@ async function refresh() {
           if (listEl.dataset.names !== newNames) {
             listEl.dataset.names = newNames;
             listEl.innerHTML = '';
+            // Fetch death counts in parallel then render cards
+            var deathMap = {};
+            try {
+              var dr = await fetch('/api/public/' + serverId + '/deaths');
+              if (dr.ok) deathMap = await dr.json();
+            } catch(e) {}
             p.online.forEach(function(name) {
               var isBedrock = name.charAt(0) === '.';
               var displayName = isBedrock ? name.slice(1) : name;
+              // Death map keys are canonical (.Steve for Bedrock, Steve for Java)
+              var deaths = deathMap[name] !== undefined ? deathMap[name]
+                         : deathMap[displayName] !== undefined ? deathMap[displayName]
+                         : null;
               var card = document.createElement('div'); card.className = 'player-card';
               var av = document.createElement('div'); av.className = 'player-av';
               av.textContent = displayName.slice(0,2).toUpperCase();
               var info = document.createElement('div'); info.className = 'player-info';
+              var deathBadge = (deaths !== null && deaths > 0)
+                ? '<span class="player-deaths">☠ ' + deaths + '</span>' : '';
               info.innerHTML =
-                '<span class="player-name">'+escHtml(name)+'</span>'+
-                '<span class="player-type '+(isBedrock?'bedrock':'java')+'">'+(isBedrock?'Bedrock':'Java')+'</span>';
+                '<span class="player-name">'+escHtml(displayName)+'</span>'+
+                '<div style="display:flex;gap:3px;align-items:center">'+
+                  '<span class="player-type '+(isBedrock?'bedrock':'java')+'">'+(isBedrock?'Bedrock':'Java')+'</span>'+
+                  deathBadge+
+                '</div>';
               card.appendChild(av); card.appendChild(info);
               listEl.appendChild(card);
               if (isBedrock) loadBedrockHead(displayName, av);

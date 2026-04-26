@@ -288,9 +288,10 @@ body {
   width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; font-size: 9px;
 }
-.act-icon.join  { background: rgba(109,189,138,.12); }
-.act-icon.leave { background: rgba(212,99,90,.12); }
-.act-icon.death { background: rgba(212,164,90,.12); }
+.act-icon.join          { background: rgba(109,189,138,.12); }
+.act-icon.leave         { background: rgba(212,99,90,.12); }
+.act-icon.death         { background: rgba(212,164,90,.12); }
+.act-icon.villager_death{ background: rgba(106,171,207,.12); }
 .act-body { flex: 1; min-width: 0; }
 .act-name { font-size: 0.72rem; font-family: var(--mono); font-weight: 500; }
 .act-msg  { font-size: 0.62rem; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -298,9 +299,11 @@ body {
 .act-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .act-time  { font-size: 0.55rem; color: var(--muted2); font-family: var(--mono); }
 .act-badge { font-size: 0.48rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .04em; }
-.act-badge.join  { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
-.act-badge.leave { background: rgba(212,99,90,.1);   color: var(--red);   border: 1px solid rgba(212,99,90,.2); }
-.act-badge.death { background: rgba(212,164,90,.1);  color: var(--amber); border: 1px solid rgba(212,164,90,.2); }
+.act-badge.join          { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
+.act-badge.leave         { background: rgba(212,99,90,.1);   color: var(--red);   border: 1px solid rgba(212,99,90,.2); }
+.act-badge.death         { background: rgba(212,164,90,.1);  color: var(--amber); border: 1px solid rgba(212,164,90,.2); }
+.act-badge.villager_death{ background: rgba(106,171,207,.1); color: var(--blue);  border: 1px solid rgba(106,171,207,.2); }
+.act-loc { font-size: 0.52rem; color: var(--muted2); font-family: var(--mono); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .act-type { font-size: 0.48rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .03em; }
 .act-type.bedrock { background: rgba(106,171,207,.1); color: var(--blue);  border: 1px solid rgba(106,171,207,.2); }
 .act-type.java    { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
@@ -532,12 +535,44 @@ body {
             <option value="join">Joins</option>
             <option value="leave">Leaves</option>
             <option value="death">Deaths</option>
+            <option value="villager_death">Villager Deaths</option>
           </select>
           <button class="console-clear" style="border:1px solid var(--border2);border-radius:5px;padding:4px 9px;background:var(--card2)" onclick="mClearActivity()">Clear</button>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:5px" id="m-act-list">
         <div id="m-act-empty" style="text-align:center;padding:40px 0;color:var(--muted2);font-size:0.74rem">No activity yet — captured from console logs</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIEW: Deaths ── -->
+  <div class="view" id="view-deaths">
+    <!-- Player grid -->
+    <div id="m-deaths-player-view" style="display:flex;flex-direction:column;height:100%">
+      <div class="section" style="padding-bottom:10px;flex:1;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font-size:0.72rem;font-weight:600">Death Log</div>
+            <span style="font-size:0.55rem;color:var(--muted);background:var(--card2);border:1px solid var(--border2);padding:1px 5px;border-radius:3px;font-family:var(--mono)" id="m-deaths-player-count">0 players</span>
+          </div>
+          <button class="console-clear" style="border:1px solid var(--border2);border-radius:5px;padding:4px 9px;background:var(--card2)" onclick="mLoadDeathsTab()">Refresh</button>
+        </div>
+        <div style="flex:1;overflow-y:auto">
+          <div id="m-deaths-player-empty" style="text-align:center;padding:40px 0;color:var(--muted2);font-size:0.74rem">No deaths recorded yet</div>
+          <div id="m-deaths-player-grid" style="display:flex;flex-direction:column;gap:7px"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Per-player detail -->
+    <div id="m-deaths-detail-view" style="display:none;flex-direction:column;height:100%">
+      <div class="section" style="padding-bottom:10px;flex:1;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <button class="console-clear" style="border:1px solid var(--border2);border-radius:5px;padding:4px 9px;background:var(--card2)" onclick="mShowDeathsPlayerView()">← Back</button>
+          <div style="font-size:0.72rem;font-weight:600" id="m-deaths-detail-name"></div>
+          <span style="font-size:0.55rem;color:var(--muted);background:var(--card2);border:1px solid var(--border2);padding:1px 5px;border-radius:3px;font-family:var(--mono)" id="m-deaths-detail-count"></span>
+        </div>
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px" id="m-deaths-detail-list"></div>
       </div>
     </div>
   </div>
@@ -561,6 +596,10 @@ body {
   <button class="nav-tab" id="nav-activity" onclick="showView('activity')">
     <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1m0 13A6 6 0 1 1 8 2a6 6 0 0 1 0 12m.5-6.5V4.5a.5.5 0 0 0-1 0v3.207l-1.854 1.853a.5.5 0 0 0 .708.707L8.5 8.414V8.5z"/></svg>
     Activity
+  </button>
+  <button class="nav-tab" id="nav-deaths" onclick="showView('deaths')">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1M4.5 6.5a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0m5 0a.5.5 0 1 1 1 0 .5.5 0 0 1-1 0M6 9.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5"/></svg>
+    Deaths
   </button>
 </div>
 
@@ -590,15 +629,59 @@ var currentRole = 'admin';
 var pollTimer = null;
 var playerTimer = null;
 var sseSource = null;
+var replaying = false;
 var dashTimer = null;
 
 // ── Auth ──────────────────────────────────────────────────────────────────
+// ── Appearance ───────────────────────────────────────────────────────────
+var AP_THEMES = {
+  warm:     {'--bg':'#141210','--sb':'#1a1714','--card':'#1f1c19','--card2':'#252119','--card3':'#2a261f','--border':'#2e2922','--border2':'#362f26','--text':'#e8e2d9','--muted':'#7a6f62','--muted2':'#4a4238','--accent':'#c8b89a','--green':'#6dbd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#6aabcf'},
+  cool:     {'--bg':'#0f1218','--sb':'#141921','--card':'#1a2130','--card2':'#1f2838','--card3':'#243040','--border':'#263040','--border2':'#2e3a4e','--text':'#d8e4f0','--muted':'#5a7a96','--muted2':'#2e4460','--accent':'#7ab3d4','--green':'#5ec97a','--red':'#d46a5a','--amber':'#d4a45a','--blue':'#7ab3d4'},
+  forest:   {'--bg':'#0d1410','--sb':'#111a13','--card':'#162018','--card2':'#1a2820','--card3':'#1f3025','--border':'#233828','--border2':'#2a4230','--text':'#d8edd8','--muted':'#5a7a62','--muted2':'#2e4a38','--accent':'#7abd8a','--green':'#a8d47a','--red':'#d4635a','--amber':'#d4c45a','--blue':'#6aabcf'},
+  midnight: {'--bg':'#08080f','--sb':'#0d0d18','--card':'#121220','--card2':'#181828','--card3':'#1e1e32','--border':'#222235','--border2':'#2a2a42','--text':'#e0dff8','--muted':'#6a6a92','--muted2':'#3a3a58','--accent':'#9a8adf','--green':'#6dbd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#7a9adf'},
+  mocha:    {'--bg':'#1a1008','--sb':'#221508','--card':'#2a1c0e','--card2':'#322216','--card3':'#3a2a1e','--border':'#3e2e1e','--border2':'#4a3828','--text':'#f0e0c8','--muted':'#8a6a4a','--muted2':'#5a4030','--accent':'#d4a45a','--green':'#7abd8a','--red':'#d4635a','--amber':'#d4a45a','--blue':'#6aabcf'}
+};
+
+function mApplyTheme(id) {
+  var t = AP_THEMES[id || 'warm'];
+  if (t) Object.keys(t).forEach(function(k) { document.documentElement.style.setProperty(k, t[k]); });
+}
+
+function mApplyPanelIcon() {
+  try {
+    var raw = localStorage.getItem('mcpanel_icon'), pref = raw ? JSON.parse(raw) : null, url = null;
+    if (pref && pref.mode === 'mc' && pref.value)
+      url = 'https://minotar.net/helm/' + encodeURIComponent(pref.value) + '/64.png';
+    else if (pref && pref.mode === 'url' && pref.value) url = pref.value;
+    if (url) document.getElementById('tb-icon').innerHTML =
+      '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror=\"this.parentNode.textContent=\'⛰\'\">';
+  } catch(e) {}
+}
+
+// Apply instantly from localStorage (no flash)
+(function() {
+  try { mApplyTheme(localStorage.getItem('mcpanel_theme')); } catch(e) {}
+})();
+
+async function mLoadAppearance() {
+  try {
+    var r = await fetch('/api/settings/appearance');
+    if (!r.ok) return;
+    var d = await r.json();
+    if (d.theme)      localStorage.setItem('mcpanel_theme',      d.theme);
+    if (d.icon)       localStorage.setItem('mcpanel_icon',       d.icon);
+    if (d.login_icon) localStorage.setItem('mcpanel_login_icon', d.login_icon);
+    mApplyTheme(d.theme);
+    mApplyPanelIcon();
+  } catch(e) {}
+}
+
 window.addEventListener('load', async function() {
   // Redirect desktop browsers to the full panel dashboard
   var ua = navigator.userAgent || '';
   var isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua) ||
     (navigator.maxTouchPoints > 1 && window.innerWidth < 768);
-  if (!isMobile) { window.location.replace('/dashboard'); return; }
+  if (!isMobile) { window.location.replace('/'); return; }
 
   try {
     var r = await fetch('/api/auth/me');
@@ -612,24 +695,25 @@ window.addEventListener('load', async function() {
     var initial = data.username[0].toUpperCase();
     document.getElementById('tb-user').textContent = initial;
     document.getElementById('dr-name').textContent = data.username;
-    document.getElementById('dr-role').textContent = currentRole === 'admin' ? 'Administrator' : 'Viewer';
-    // Viewers can't control servers — hide action buttons and command input
-    if (currentRole !== 'admin') {
+    document.getElementById('dr-role').textContent = currentRole === 'admin' ? 'Administrator' : currentRole === 'operator' ? 'Operator' : 'Viewer';
+    // Viewers: hide controls, console tab, command row
+    if (currentRole === 'viewer') {
       document.querySelectorAll('.ctrl-btn').forEach(function(b) { b.style.display = 'none'; });
       var cr = document.querySelector('.ctrl-row');
       if (cr) cr.style.display = 'none';
       var cmdRow = document.querySelector('.cmd-row');
       if (cmdRow) cmdRow.style.display = 'none';
+      // Hide console nav tab
+      var consoleNav = document.getElementById('nav-console');
+      if (consoleNav) consoleNav.style.display = 'none';
     }
-    // Apply panel icon
-    try {
-      var raw = localStorage.getItem('mcpanel_icon'), pref = raw ? JSON.parse(raw) : null, url = null;
-      if (pref && pref.mode === 'mc' && pref.value)
-        url = 'https://minotar.net/helm/' + encodeURIComponent(pref.value) + '/64.png';
-      else if (pref && pref.mode === 'url' && pref.value) url = pref.value;
-      if (url) document.getElementById('tb-icon').innerHTML =
-        '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror="this.parentNode.textContent=\'⛰\'">';
-    } catch(e) {}
+    // Non-admins: hide new server button and user management
+    if (currentRole !== 'admin') {
+      document.querySelectorAll('.admin-only').forEach(function(el) { el.style.display = 'none'; });
+    }
+    // Apply icon from localStorage, then sync full appearance from DB
+    mApplyPanelIcon();
+    mLoadAppearance();
   } catch(e) { window.location.replace('/login'); return; }
   // Always start on dashboard
   showView('dash');
@@ -651,6 +735,8 @@ function showView(name) {
   }
   // Render activity log when switching to it
   if (name === 'activity') { mRenderActivity(); }
+  // Load deaths tab
+  if (name === 'deaths') { mLoadDeathsTab(); }
 }
 
 // ── Servers ────────────────────────────────────────────────────────────────
@@ -715,10 +801,12 @@ function selectServer(id) {
   // Reset metrics
   ['m-cpu','m-mem-val','m-pl-count'].forEach(function(id) { var el=document.getElementById(id); if(el) el.textContent='—'; });
   setMBar('m-cpu-bar', 0); setMBar('m-mem-val-bar', 0);
-  // Clear console + activity
+  // Clear console + activity (in-memory only — DB is untouched so history persists)
   document.getElementById('m-console').innerHTML = '';
-  mClearActivity();
+  mResetActivity();
+  mResetDeathsView();
   pollStatus(); pollPlayers(); startConsoleStream();
+  mFetchConsoleHistory(id);
   mFetchActivityHistory(id);
 }
 
@@ -916,6 +1004,16 @@ function mParseLogEvent(raw) {
     var p = leaveMatch[1];
     return { type:'leave', player:p, msg:'left the game', time:timeStr, isBedrock:p.charAt(0)==='.' };
   }
+  // Villager / named entity death
+  var villagerMatch = msg.match(/^Named entity [A-Za-z0-9_.]+\['([^']+)'\/(\d+),\s*l='ServerLevel\[([^\]]+)\]',\s*x=([\d.-]+),\s*y=([\d.-]+),\s*z=([\d.-]+)\] died:\s*(.+)$/);
+  if (villagerMatch) {
+    var vKM = villagerMatch[7].match(/(?:was slain by|was shot by|was killed by|was blown up by)\s+([\S]+)/);
+    return { type:'villager_death', player:villagerMatch[1], msg:villagerMatch[7].trim(),
+      time:timeStr, isBedrock:false, dim:villagerMatch[3],
+      coords:'x:'+parseFloat(villagerMatch[4]).toFixed(1)+' y:'+parseFloat(villagerMatch[5]).toFixed(1)+' z:'+parseFloat(villagerMatch[6]).toFixed(1),
+      killer: vKM ? vKM[1] : null };
+  }
+
   var msgLo = msg.toLowerCase();
   for (var i = 0; i < M_DEATH_PATTERNS.length; i++) {
     var idx = msgLo.indexOf(M_DEATH_PATTERNS[i]);
@@ -931,6 +1029,12 @@ function mParseLogEvent(raw) {
 
 function mAddActivity(event) {
   if (!event) return;
+  // Dedup: drop if the last few entries already have the same type+player+time
+  // (happens when SSE replays lines already loaded from the DB via mFetchActivityHistory).
+  var isDup = mActivityLog.some(function(e) {
+    return e.type === event.type && e.player === event.player && e.time === event.time;
+  });
+  if (isDup) return;
   mActivityLog.push(event);
   if (mActivityLog.length > M_ACTIVITY_MAX) mActivityLog.shift();
   var actView = document.getElementById('view-activity');
@@ -971,27 +1075,40 @@ function mPrependActivityEntry(event) {
 }
 
 function mBuildEntry(event) {
+  var isVillager = event.type === 'villager_death';
   var isBedrock = event.isBedrock;
   var displayName = isBedrock ? event.player.slice(1) : event.player;
   var entry = document.createElement('div'); entry.className = 'act-entry';
   var av = document.createElement('div'); av.className = 'act-av';
-  av.textContent = displayName.slice(0,2).toUpperCase();
+  if (isVillager) { av.textContent = '🐾'; av.style.fontSize = '13px'; }
+  else { av.textContent = displayName.slice(0,2).toUpperCase(); }
   var icon = document.createElement('div'); icon.className = 'act-icon ' + event.type;
   icon.textContent = event.type === 'join' ? '→' : event.type === 'leave' ? '←' : '☠';
   var body = document.createElement('div'); body.className = 'act-body';
-  var nameEl = document.createElement('div'); nameEl.className = 'act-name'; nameEl.textContent = event.player;
-  var msgEl = document.createElement('div'); msgEl.className = 'act-msg' + (event.type === 'death' ? ' death' : '');
+  var nameEl = document.createElement('div'); nameEl.className = 'act-name';
+  nameEl.textContent = isVillager ? event.player + ' (villager)' : event.player;
+  var msgEl = document.createElement('div'); msgEl.className = 'act-msg death';
   msgEl.textContent = event.msg; msgEl.title = event.msg;
   body.appendChild(nameEl); body.appendChild(msgEl);
+  if (isVillager) {
+    var locEl = document.createElement('div'); locEl.className = 'act-loc';
+    var locText = event.dim + ' · ' + event.coords;
+    if (event.killer) locText += ' · by ' + event.killer;
+    locEl.textContent = locText;
+    body.appendChild(locEl);
+  }
   var right = document.createElement('div'); right.className = 'act-right';
   var timeEl = document.createElement('div'); timeEl.className = 'act-time'; timeEl.textContent = event.time;
   var evBadge = document.createElement('span'); evBadge.className = 'act-badge ' + event.type;
-  evBadge.textContent = event.type === 'join' ? 'JOIN' : event.type === 'leave' ? 'LEAVE' : 'DEATH';
-  var typeBadge = document.createElement('span'); typeBadge.className = 'act-type ' + (isBedrock ? 'bedrock' : 'java');
-  typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
-  right.appendChild(timeEl); right.appendChild(evBadge); right.appendChild(typeBadge);
+  evBadge.textContent = isVillager ? 'VILLAGER' : event.type === 'join' ? 'JOIN' : event.type === 'leave' ? 'LEAVE' : 'DEATH';
+  right.appendChild(timeEl); right.appendChild(evBadge);
+  if (!isVillager) {
+    var typeBadge = document.createElement('span'); typeBadge.className = 'act-type ' + (isBedrock ? 'bedrock' : 'java');
+    typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+    right.appendChild(typeBadge);
+  }
   entry.appendChild(av); entry.appendChild(icon); entry.appendChild(body); entry.appendChild(right);
-  mLoadActivityHead(displayName, isBedrock, av);
+  if (!isVillager) mLoadActivityHead(displayName, isBedrock, av);
   return entry;
 }
 
@@ -1038,12 +1155,19 @@ function mDrawHead(url, avEl, isBedrock) {
   img.src = url;
 }
 
-function mClearActivity() {
+function mResetActivity() {
   mActivityLog = [];
   var list = document.getElementById('m-act-list');
   if (list) list.innerHTML = '<div id="m-act-empty" style="text-align:center;padding:40px 0;color:var(--muted2);font-size:0.74rem">No activity yet — captured from console logs</div>';
   var countEl = document.getElementById('m-act-count');
   if (countEl) countEl.textContent = '0 events';
+}
+
+async function mClearActivity() {
+  try {
+    await fetch(API + '/api/servers/' + currentId + '/activity/clear', { method: 'POST' });
+  } catch(e) {}
+  mResetActivity();
 }
 
 async function mFetchActivityHistory(serverId) {
@@ -1057,50 +1181,370 @@ async function mFetchActivityHistory(serverId) {
       var timeStr = d.getHours().toString().padStart(2,'0') + ':' +
                     d.getMinutes().toString().padStart(2,'0') + ':' +
                     d.getSeconds().toString().padStart(2,'0');
-      mActivityLog.push({
-        type:      row.event,
-        player:    row.player,
-        msg:       row.detail || (row.event === 'join' ? 'joined the game' : row.event === 'leave' ? 'left the game' : 'died'),
-        time:      timeStr,
-        isBedrock: row.player.charAt(0) === '.'
-      });
+      var event;
+      if (row.event === 'villager_death') {
+        try {
+          var vd = JSON.parse(row.detail);
+          var km = vd.msg.match(/(?:was slain by|was shot by|was killed by|was blown up by)\s+(\S+)/);
+          event = {
+            type: 'villager_death', player: row.player, msg: vd.msg, time: timeStr,
+            isBedrock: false, dim: vd.dim,
+            coords: 'x:'+parseFloat(vd.x).toFixed(1)+' y:'+parseFloat(vd.y).toFixed(1)+' z:'+parseFloat(vd.z).toFixed(1),
+            killer: km ? km[1] : null
+          };
+        } catch(e) {
+          event = { type:'death', player:row.player, msg:row.detail||'died', time:timeStr, isBedrock:false };
+        }
+      } else {
+        event = {
+          type:      row.event,
+          player:    row.player,
+          msg:       row.detail || (row.event === 'join' ? 'joined the game' : row.event === 'leave' ? 'left the game' : 'died'),
+          time:      timeStr,
+          isBedrock: row.player.charAt(0) === '.'
+        };
+      }
+      mActivityLog.push(event);
     });
     if (mActivityLog.length > M_ACTIVITY_MAX) mActivityLog = mActivityLog.slice(-M_ACTIVITY_MAX);
     mRenderActivity();
   } catch(e) {}
 }
 
+// ── Death log tab (mobile) ────────────────────────────────────────────────
+
+async function mLoadDeathsTab() {
+  if (!currentId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentId + '/deaths');
+    if (!res.ok) return;
+    var players = await res.json();
+    mRenderDeathsGrid(players);
+  } catch(e) {}
+}
+
+function mRenderDeathsGrid(players) {
+  var grid = document.getElementById('m-deaths-player-grid');
+  var empty = document.getElementById('m-deaths-player-empty');
+  var countEl = document.getElementById('m-deaths-player-count');
+  if (!grid) return;
+  if (countEl) countEl.textContent = (players.length + 1) + ' entries';
+  grid.innerHTML = '';
+  if (empty) empty.style.display = 'none';
+
+  // ── Villagers card (always first) ─────────────────────────────────────
+  var vCard = document.createElement('div');
+  vCard.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:7px;cursor:pointer';
+  vCard.onclick = mOpenVillagerDeaths;
+
+  var vIcon = document.createElement('div');
+  vIcon.className = 'act-av';
+  vIcon.style.cssText = 'width:34px;height:34px;border-radius:5px;background:rgba(212,164,90,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden';
+  var vImg = document.createElement('img');
+  vImg.src = 'https://cdn.modrinth.com/data/7L6RRxjO/fa51cf93cf6f19ea5ce731bb353eb0ff6e1d5eea.png';
+  vImg.style.cssText = 'width:34px;height:34px;image-rendering:pixelated';
+  vImg.onerror = function() { vIcon.textContent = '🗺'; };
+  vIcon.appendChild(vImg);
+
+  var vInfo = document.createElement('div');
+  vInfo.style.cssText = 'flex:1;min-width:0';
+
+  var vNameRow = document.createElement('div');
+  vNameRow.style.cssText = 'display:flex;align-items:center;gap:5px;margin-bottom:2px';
+  var vNameEl = document.createElement('div');
+  vNameEl.style.cssText = 'font-size:0.74rem;font-weight:500;font-family:var(--mono);flex:1;min-width:0';
+  vNameEl.textContent = 'Villagers';
+  var vBadge = document.createElement('span');
+  vBadge.className = 'act-type';
+  vBadge.style.cssText = 'background:rgba(212,164,90,.1);color:var(--amber);border:1px solid rgba(212,164,90,.25)';
+  vBadge.textContent = 'NPC';
+  vNameRow.appendChild(vNameEl);
+  vNameRow.appendChild(vBadge);
+
+  var vSub = document.createElement('div');
+  vSub.style.cssText = 'font-size:0.6rem;color:var(--muted)';
+  vSub.textContent = 'Named villager deaths';
+
+  vInfo.appendChild(vNameRow);
+  vInfo.appendChild(vSub);
+  vCard.appendChild(vIcon);
+  vCard.appendChild(vInfo);
+  grid.appendChild(vCard);
+
+  // ── Player cards ──────────────────────────────────────────────────────
+  players.forEach(function(p) {
+    var isBedrock = p.player.charAt(0) === '.';
+    var displayName = isBedrock ? p.player.slice(1) : p.player;
+    var card = document.createElement('div');
+    card.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border:1px solid var(--border2);border-radius:7px;cursor:pointer';
+    card.onclick = function() { mOpenDeathDetail(p.player); };
+
+    // Avatar — use act-av class (matches activity log sizing/canvas CSS)
+    var av = document.createElement('div');
+    av.className = 'act-av';
+    av.textContent = displayName.slice(0,2).toUpperCase();
+    // Load head via same loader activity uses (GeyserMC for Bedrock, Minotar for Java)
+    mLoadActivityHead(displayName, isBedrock, av);
+
+    var info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0';
+
+    var nameRow = document.createElement('div');
+    nameRow.style.cssText = 'display:flex;align-items:center;gap:5px;margin-bottom:2px';
+    var nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:0.74rem;font-weight:500;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0';
+    nameEl.textContent = displayName;
+    // Platform badge — same class as activity log
+    var typeBadge = document.createElement('span');
+    typeBadge.className = 'act-type ' + (isBedrock ? 'bedrock' : 'java');
+    typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+    nameRow.appendChild(nameEl);
+    nameRow.appendChild(typeBadge);
+
+    var sub = document.createElement('div');
+    sub.style.cssText = 'font-size:0.6rem;color:var(--muted)';
+    var d = new Date(p.last_ts);
+    sub.textContent = 'Last: ' + d.toLocaleDateString([], {month:'short',day:'numeric'});
+    info.appendChild(nameRow);
+    info.appendChild(sub);
+
+    var badge = document.createElement('span');
+    badge.style.cssText = 'font-size:0.62rem;background:rgba(212,99,90,.12);color:var(--red);border:1px solid rgba(212,99,90,.2);border-radius:3px;padding:2px 7px;font-family:var(--mono);flex-shrink:0';
+    badge.textContent = '☠ ' + p.deaths;
+
+    card.appendChild(av);
+    card.appendChild(info);
+    card.appendChild(badge);
+    grid.appendChild(card);
+  });
+}
+
+async function mOpenDeathDetail(player) {
+  if (!currentId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentId + '/deaths/' + encodeURIComponent(player));
+    if (!res.ok) return;
+    var events = await res.json();
+    var isBedrock = player.charAt(0) === '.';
+    var displayName = isBedrock ? player.slice(1) : player;
+
+    document.getElementById('m-deaths-player-view').style.display = 'none';
+    var detailView = document.getElementById('m-deaths-detail-view');
+    detailView.style.display = 'flex';
+
+    var dNameEl = document.getElementById('m-deaths-detail-name');
+    dNameEl.textContent = displayName;
+    // Remove any previous platform badge
+    var oldPlatBadge = document.getElementById('m-deaths-detail-plat');
+    if (oldPlatBadge) oldPlatBadge.remove();
+    var platBadge = document.createElement('span');
+    platBadge.id = 'm-deaths-detail-plat';
+    platBadge.className = 'act-type ' + (isBedrock ? 'bedrock' : 'java');
+    platBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+    dNameEl.parentNode.insertBefore(platBadge, dNameEl.nextSibling);
+    var countEl = document.getElementById('m-deaths-detail-count');
+    if (countEl) countEl.textContent = events.length + ' death' + (events.length !== 1 ? 's' : '');
+
+    var list = document.getElementById('m-deaths-detail-list');
+    list.innerHTML = '';
+    if (events.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted2);font-size:0.74rem">No deaths recorded</div>';
+      return;
+    }
+    events.forEach(function(ev) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:flex-start;gap:9px;padding:9px 11px;background:var(--card2);border:1px solid var(--border2);border-radius:6px';
+
+      var icon = document.createElement('div');
+      icon.style.cssText = 'width:22px;height:22px;border-radius:4px;background:rgba(212,99,90,.12);display:flex;align-items:center;justify-content:center;font-size:0.68rem;flex-shrink:0;margin-top:1px';
+      icon.textContent = '☠';
+
+      var body = document.createElement('div');
+      body.style.cssText = 'flex:1;min-width:0';
+
+      var msg = document.createElement('div');
+      msg.style.cssText = 'font-size:0.71rem;color:var(--amber);line-height:1.4';
+      msg.textContent = ev.detail;
+      body.appendChild(msg);
+
+      // Location — dim pill + coords (populated by RCON after death)
+      if (ev.dim || ev.coords) {
+        var loc = document.createElement('div');
+        loc.style.cssText = 'display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap';
+        if (ev.dim) {
+          var dimEl = document.createElement('span');
+          dimEl.style.cssText = 'font-size:0.55rem;color:var(--muted);font-family:var(--mono);background:var(--card);border:1px solid var(--border2);padding:1px 4px;border-radius:3px';
+          dimEl.textContent = ev.dim.replace('minecraft:', '');
+          loc.appendChild(dimEl);
+        }
+        if (ev.coords) {
+          var coordEl = document.createElement('span');
+          coordEl.style.cssText = 'font-size:0.55rem;color:var(--muted2);font-family:var(--mono)';
+          coordEl.textContent = ev.coords.split(',').map(function(v) { return parseFloat(v).toFixed(1); }).join(', ');
+          loc.appendChild(coordEl);
+        }
+        body.appendChild(loc);
+      }
+
+      var ts = document.createElement('div');
+      ts.style.cssText = 'font-size:0.59rem;color:var(--muted2);font-family:var(--mono);margin-top:3px';
+      var d = new Date(ev.ts);
+      ts.textContent = d.toLocaleDateString([], {year:'numeric',month:'short',day:'numeric'}) + '  ' +
+                       d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      body.appendChild(ts);
+      row.appendChild(icon);
+      row.appendChild(body);
+      list.appendChild(row);
+    });
+  } catch(e) {}
+}
+
+function mShowDeathsPlayerView() {
+  document.getElementById('m-deaths-detail-view').style.display = 'none';
+  document.getElementById('m-deaths-player-view').style.display = 'flex';
+}
+
+async function mOpenVillagerDeaths() {
+  if (!currentId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentId + '/deaths/villagers');
+    if (!res.ok) return;
+    var rows = await res.json();
+
+    document.getElementById('m-deaths-player-view').style.display = 'none';
+    var detailView = document.getElementById('m-deaths-detail-view');
+    detailView.style.display = 'flex';
+
+    var dNameEl = document.getElementById('m-deaths-detail-name');
+    dNameEl.textContent = 'Villagers';
+    var oldPlat = document.getElementById('m-deaths-detail-plat');
+    if (oldPlat) oldPlat.remove();
+    var platBadge = document.createElement('span');
+    platBadge.id = 'm-deaths-detail-plat';
+    platBadge.className = 'act-type';
+    platBadge.style.cssText = 'background:rgba(212,164,90,.1);color:var(--amber);border:1px solid rgba(212,164,90,.25)';
+    platBadge.textContent = 'NPC';
+    dNameEl.parentNode.insertBefore(platBadge, dNameEl.nextSibling);
+
+    var countEl = document.getElementById('m-deaths-detail-count');
+    if (countEl) countEl.textContent = rows.length + ' death' + (rows.length !== 1 ? 's' : '');
+
+    var list = document.getElementById('m-deaths-detail-list');
+    list.innerHTML = '';
+    if (rows.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted2);font-size:0.74rem">No villager deaths recorded</div>';
+      return;
+    }
+    rows.forEach(function(row) {
+      var vd = null;
+      try { vd = JSON.parse(row.detail || '{}'); } catch(e) { vd = {}; }
+
+      var entry = document.createElement('div');
+      entry.style.cssText = 'display:flex;align-items:flex-start;gap:9px;padding:9px 11px;background:var(--card2);border:1px solid var(--border2);border-radius:6px';
+
+      var icon = document.createElement('div');
+      icon.style.cssText = 'width:22px;height:22px;border-radius:4px;background:rgba(212,164,90,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;overflow:hidden';
+      var iImg = document.createElement('img');
+      iImg.src = 'https://cdn.modrinth.com/data/7L6RRxjO/fa51cf93cf6f19ea5ce731bb353eb0ff6e1d5eea.png';
+      iImg.style.cssText = 'width:22px;height:22px;image-rendering:pixelated';
+      iImg.onerror = function() { icon.textContent = '🗺'; };
+      icon.appendChild(iImg);
+
+      var body = document.createElement('div');
+      body.style.cssText = 'flex:1;min-width:0';
+
+      // Villager name
+      var vName = document.createElement('div');
+      vName.style.cssText = 'font-size:0.72rem;font-weight:600;font-family:var(--mono);margin-bottom:2px';
+      vName.textContent = row.player;
+
+      // Death message
+      var msg = document.createElement('div');
+      msg.style.cssText = 'font-size:0.68rem;color:var(--amber);line-height:1.4;margin-bottom:3px';
+      msg.textContent = vd.msg || row.detail || 'died';
+
+      // Coords + dimension
+      var meta = document.createElement('div');
+      meta.style.cssText = 'display:flex;align-items:center;gap:5px;flex-wrap:wrap';
+      if (vd.dim) {
+        var dim = document.createElement('span');
+        dim.style.cssText = 'font-size:0.57rem;color:var(--muted);font-family:var(--mono);background:var(--card);border:1px solid var(--border2);padding:1px 4px;border-radius:3px';
+        dim.textContent = vd.dim;
+        meta.appendChild(dim);
+      }
+      if (vd.x !== undefined) {
+        var coords = document.createElement('span');
+        coords.style.cssText = 'font-size:0.57rem;color:var(--muted2);font-family:var(--mono)';
+        coords.textContent = parseFloat(vd.x).toFixed(1) + ', ' + parseFloat(vd.y).toFixed(1) + ', ' + parseFloat(vd.z).toFixed(1);
+        meta.appendChild(coords);
+      }
+
+      body.appendChild(vName);
+      body.appendChild(msg);
+      body.appendChild(meta);
+
+      // Timestamp
+      var d = new Date(row.ts);
+      var timeEl = document.createElement('div');
+      timeEl.style.cssText = 'font-size:0.57rem;color:var(--muted2);font-family:var(--mono);white-space:nowrap;flex-shrink:0;margin-top:2px';
+      timeEl.textContent = d.getHours().toString().padStart(2,'0') + ':' +
+                           d.getMinutes().toString().padStart(2,'0') + ':' +
+                           d.getSeconds().toString().padStart(2,'0');
+
+      entry.appendChild(icon);
+      entry.appendChild(body);
+      entry.appendChild(timeEl);
+      list.appendChild(entry);
+    });
+  } catch(e) {}
+}
+
+function mResetDeathsView() {
+  var grid = document.getElementById('m-deaths-player-grid');
+  if (grid) grid.innerHTML = '';
+  var empty = document.getElementById('m-deaths-player-empty');
+  if (empty) empty.style.display = '';
+  var countEl = document.getElementById('m-deaths-player-count');
+  if (countEl) countEl.textContent = '0 players';
+  // Reset to player grid view
+  var pv = document.getElementById('m-deaths-player-view');
+  if (pv) pv.style.display = 'flex';
+  var dv = document.getElementById('m-deaths-detail-view');
+  if (dv) dv.style.display = 'none';
+}
+
 // ── Console SSE ────────────────────────────────────────────────────────────
+// Load persisted console lines from the DB via REST, then render them.
+// Called on server select so history is always visible regardless of SSE timing.
+async function mFetchConsoleHistory(serverId) {
+  try {
+    var res = await fetch(API + '/api/servers/' + serverId + '/logs/history?limit=500');
+    if (!res.ok) return;
+    var lines = await res.json(); // [{ text, kind }] oldest first
+    var el = document.getElementById('m-console');
+    if (!el || serverId !== currentId) return;
+    var frag = document.createDocumentFragment();
+    lines.forEach(function(l) { frag.appendChild(mkLine(l.text)); });
+    while (el.children.length + frag.childNodes.length > 500) el.removeChild(el.firstChild);
+    el.appendChild(frag);
+    el.scrollTop = el.scrollHeight;
+  } catch(e) {}
+}
+
 function startConsoleStream() {
   if (sseSource) { sseSource.close(); sseSource = null; }
   setBadge(false);
-  var replayQ = [], replaying = true, scheduled = false;
-  sseSource = new EventSource(API + '/api/servers/' + currentId + '/logs?tail=100');
+  // tail=0 — history is already loaded via mFetchConsoleHistory, so we only
+  // want live lines from here on to avoid duplicates.
+  replaying = false;
+  sseSource = new EventSource(API + '/api/servers/' + currentId + '/logs?tail=0');
   sseSource.onopen = function() { setBadge(true); };
   sseSource.onmessage = function(e) {
-    if (replaying) {
-      replayQ.push(e.data);
-      if (!scheduled) {
-        scheduled = true;
-        setTimeout(function() {
-          scheduled = false;
-          var el = document.getElementById('m-console');
-          if (!el) return;
-          var frag = document.createDocumentFragment();
-          replayQ.splice(0).forEach(function(line) { frag.appendChild(mkLine(line)); });
-          while (el.children.length + frag.childNodes.length > 500) el.removeChild(el.firstChild);
-          el.appendChild(frag);
-          el.scrollTop = el.scrollHeight;
-          replaying = false;
-        }, 150);
-      }
-    } else {
-      var el = document.getElementById('m-console');
-      if (!el) return;
-      while (el.children.length >= 500) el.removeChild(el.firstChild);
-      el.appendChild(mkLine(e.data));
-      el.scrollTop = el.scrollHeight;
-    }
+    var el = document.getElementById('m-console');
+    if (!el) return;
+    while (el.children.length >= 500) el.removeChild(el.firstChild);
+    el.appendChild(mkLine(e.data));
+    el.scrollTop = el.scrollHeight;
   };
   sseSource.onerror = function() {
     setBadge(false); sseSource.close(); sseSource = null;
@@ -1137,7 +1581,7 @@ function setBadge(live) {
 
 // ── Send command ───────────────────────────────────────────────────────────
 async function mSendCmd() {
-  if (currentRole !== 'admin') return;
+  if (currentRole === 'viewer') return;
   var inp = document.getElementById('m-cmd');
   var cmd = inp.value.trim();
   if (!cmd || !currentId) return;
@@ -1154,7 +1598,7 @@ async function mSendCmd() {
 
 // ── Server actions ─────────────────────────────────────────────────────────
 async function mAction(cmd) {
-  if (!currentId || currentRole !== 'admin') return;
+  if (!currentId || currentRole === 'viewer') return;
   ['m-btn-start','m-btn-stop','m-btn-restart'].forEach(function(id) { var el=document.getElementById(id); if(el) el.disabled=true; });
   try {
     var r = await fetch(API + '/api/servers/' + currentId + '/' + cmd, { method: 'POST' });

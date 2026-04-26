@@ -390,9 +390,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center; font-size: 10px;
 }
-.activity-icon.join   { background: rgba(109,189,138,.12); }
-.activity-icon.leave  { background: rgba(212,99,90,.12); }
-.activity-icon.death  { background: rgba(212,164,90,.12); }
+.activity-icon.join          { background: rgba(109,189,138,.12); }
+.activity-icon.leave         { background: rgba(212,99,90,.12); }
+.activity-icon.death         { background: rgba(212,164,90,.12); }
+.activity-icon.villager_death{ background: rgba(106,171,207,.12); }
 .activity-body { flex: 1; min-width: 0; }
 .activity-name { font-size: 0.75rem; font-family: var(--mono); font-weight: 500; }
 .activity-msg  { font-size: 0.65rem; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -402,9 +403,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .activity-badge {
   font-size: 0.5rem; font-weight: 600; padding: 1px 5px; border-radius: 3px; letter-spacing: .04em;
 }
-.activity-badge.join   { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
-.activity-badge.leave  { background: rgba(212,99,90,.1);   color: var(--red);   border: 1px solid rgba(212,99,90,.2); }
-.activity-badge.death  { background: rgba(212,164,90,.1);  color: var(--amber); border: 1px solid rgba(212,164,90,.2); }
+.activity-badge.join          { background: rgba(109,189,138,.1); color: var(--green); border: 1px solid rgba(109,189,138,.2); }
+.activity-badge.leave         { background: rgba(212,99,90,.1);   color: var(--red);   border: 1px solid rgba(212,99,90,.2); }
+.activity-badge.death         { background: rgba(212,164,90,.1);  color: var(--amber); border: 1px solid rgba(212,164,90,.2); }
+.activity-badge.villager_death{ background: rgba(106,171,207,.1); color: var(--blue);  border: 1px solid rgba(106,171,207,.2); }
+.activity-loc { font-size: 0.58rem; color: var(--muted2); font-family: var(--mono); margin-top: 2px; }
 .activity-type-badge {
   font-size: 0.5rem; font-weight: 600; padding: 1px 4px; border-radius: 3px; letter-spacing: .03em;
 }
@@ -634,8 +637,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   font-size: 0.58rem; font-weight: 600; padding: 2px 6px;
   border-radius: 3px; text-transform: uppercase; letter-spacing: .05em;
 }
-.user-role-badge.admin { background: rgba(200,184,154,.08); color: var(--accent); }
-.user-role-badge.viewer { background: rgba(106,171,207,.1); color: var(--blue); }
+.user-role-badge.admin    { background: rgba(200,184,154,.08); color: var(--accent); }
+.user-role-badge.operator { background: rgba(109,189,138,.1);  color: var(--green); }
+.user-role-badge.viewer   { background: rgba(106,171,207,.1);  color: var(--blue); }
 .viewer-banner {
   background: rgba(106,171,207,.07); border: 1px solid rgba(106,171,207,.15);
   border-radius: 5px; padding: 6px 11px; font-size: 0.7rem; color: var(--blue);
@@ -1130,6 +1134,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <button class="tab-btn active" id="tab-console" onclick="goTab('console')">Console</button>
         <button class="tab-btn" id="tab-players" onclick="goTab('players')">Players</button>
         <button class="tab-btn" id="tab-activity" onclick="goTab('activity')">Activity</button>
+        <button class="tab-btn" id="tab-deaths" onclick="goTab('deaths')">Deaths</button>
         <button class="tab-btn" id="tab-files" onclick="goTab('files')">Files</button>
         <button class="tab-btn" id="tab-mods" onclick="goTab('mods')">Mods</button>
         <button class="tab-btn" id="tab-config" onclick="goTab('config')">Config</button>
@@ -1340,6 +1345,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
                 <option value="join">Joins</option>
                 <option value="leave">Leaves</option>
                 <option value="death">Deaths</option>
+                <option value="villager_death">Villager Deaths</option>
               </select>
               <button class="con-btn" onclick="clearActivityLog()">Clear</button>
             </div>
@@ -1348,6 +1354,33 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <div style="text-align:center;padding:48px 0;color:var(--muted2);font-size:0.76rem" id="activity-empty">
               No player activity yet — events are captured from console logs
             </div>
+          </div>
+        </div>
+
+        <!-- Deaths -->
+        <div class="tab-panel" id="panel-deaths">
+          <!-- Player grid view -->
+          <div id="deaths-player-view" style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;margin-bottom:10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="font-size:0.78rem;font-weight:500">Death Log</div>
+                <span style="font-size:0.58rem;color:var(--muted);background:var(--card2);border:1px solid var(--border2);padding:1px 6px;border-radius:3px;font-family:var(--mono)" id="deaths-player-count">0 players</span>
+              </div>
+              <button class="con-btn" onclick="loadDeathsTab()">Refresh</button>
+            </div>
+            <div style="flex:1;overflow-y:auto">
+              <div id="deaths-player-empty" style="text-align:center;padding:48px 0;color:var(--muted2);font-size:0.76rem">No deaths recorded yet</div>
+              <div id="deaths-player-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:7px"></div>
+            </div>
+          </div>
+          <!-- Per-player death detail view -->
+          <div id="deaths-detail-view" style="display:none;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-bottom:10px">
+              <button class="con-btn" onclick="showDeathsPlayerView()" style="padding:3px 8px;font-size:0.65rem">← Back</button>
+              <div style="font-size:0.78rem;font-weight:500" id="deaths-detail-name"></div>
+              <span style="font-size:0.58rem;color:var(--muted);background:var(--card2);border:1px solid var(--border2);padding:1px 6px;border-radius:3px;font-family:var(--mono)" id="deaths-detail-count"></span>
+            </div>
+            <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:3px" id="deaths-detail-list"></div>
           </div>
         </div>
 
@@ -1431,6 +1464,237 @@ function clearCookie(name) {
   document.cookie = name + '=; max-age=0; path=/';
 }
 
+// ── Appearance / Customisation ────────────────────────────────────────────
+
+var AP_THEMES = [
+  {
+    id: 'warm',
+    name: 'Warm Dark',
+    preview: ['#141210','#c8b89a','#6dbd8a'],
+    vars: { '--bg':'#141210','--sb':'#1a1714','--card':'#1f1c19','--card2':'#252119',
+            '--card3':'#2a261f','--border':'#2e2922','--border2':'#362f26',
+            '--text':'#e8e2d9','--muted':'#7a6f62','--muted2':'#4a4238',
+            '--accent':'#c8b89a','--green':'#6dbd8a','--red':'#d4635a',
+            '--amber':'#d4a45a','--blue':'#6aabcf' }
+  },
+  {
+    id: 'cool',
+    name: 'Cool Dark',
+    preview: ['#0f1218','#7ab3d4','#5ec97a'],
+    vars: { '--bg':'#0f1218','--sb':'#141921','--card':'#1a2130','--card2':'#1f2838',
+            '--card3':'#243040','--border':'#263040','--border2':'#2e3a4e',
+            '--text':'#d8e4f0','--muted':'#5a7a96','--muted2':'#2e4460',
+            '--accent':'#7ab3d4','--green':'#5ec97a','--red':'#d46a5a',
+            '--amber':'#d4a45a','--blue':'#7ab3d4' }
+  },
+  {
+    id: 'forest',
+    name: 'Forest',
+    preview: ['#0d1410','#7abd8a','#a8d47a'],
+    vars: { '--bg':'#0d1410','--sb':'#111a13','--card':'#162018','--card2':'#1a2820',
+            '--card3':'#1f3025','--border':'#233828','--border2':'#2a4230',
+            '--text':'#d8edd8','--muted':'#5a7a62','--muted2':'#2e4a38',
+            '--accent':'#7abd8a','--green':'#a8d47a','--red':'#d4635a',
+            '--amber':'#d4c45a','--blue':'#6aabcf' }
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    preview: ['#08080f','#9a8adf','#7a6dbd'],
+    vars: { '--bg':'#08080f','--sb':'#0d0d18','--card':'#121220','--card2':'#181828',
+            '--card3':'#1e1e32','--border':'#222235','--border2':'#2a2a42',
+            '--text':'#e0dff8','--muted':'#6a6a92','--muted2':'#3a3a58',
+            '--accent':'#9a8adf','--green':'#6dbd8a','--red':'#d4635a',
+            '--amber':'#d4a45a','--blue':'#7a9adf' }
+  },
+  {
+    id: 'mocha',
+    name: 'Mocha',
+    preview: ['#1a1008','#d4a45a','#bd8a6d'],
+    vars: { '--bg':'#1a1008','--sb':'#221508','--card':'#2a1c0e','--card2':'#322216',
+            '--card3':'#3a2a1e','--border':'#3e2e1e','--border2':'#4a3828',
+            '--text':'#f0e0c8','--muted':'#8a6a4a','--muted2':'#5a4030',
+            '--accent':'#d4a45a','--green':'#7abd8a','--red':'#d4635a',
+            '--amber':'#d4a45a','--blue':'#6aabcf' }
+  }
+];
+
+// Save to DB + localStorage
+async function apSaveAppearance(patch) {
+  // Always update localStorage immediately for instant apply on next load
+  if (patch.theme      !== undefined) { if (patch.theme)      localStorage.setItem('mcpanel_theme', patch.theme);           else localStorage.removeItem('mcpanel_theme'); }
+  if (patch.icon       !== undefined) { if (patch.icon)        localStorage.setItem('mcpanel_icon', patch.icon);             else localStorage.removeItem('mcpanel_icon'); }
+  if (patch.login_icon !== undefined) { if (patch.login_icon)  localStorage.setItem('mcpanel_login_icon', patch.login_icon); else localStorage.removeItem('mcpanel_login_icon'); }
+  try {
+    await fetch('/api/settings/appearance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+  } catch(e) {}
+}
+
+// Load from DB, fall back to localStorage, apply immediately
+async function loadAppearance() {
+  try {
+    var r = await fetch('/api/settings/appearance');
+    if (r.ok) {
+      var d = await r.json();
+      if (d.theme)      localStorage.setItem('mcpanel_theme',      d.theme);
+      if (d.icon)       localStorage.setItem('mcpanel_icon',       d.icon);
+      if (d.login_icon) localStorage.setItem('mcpanel_login_icon', d.login_icon);
+    }
+  } catch(e) {}
+  applyAppearance();
+}
+
+function applyAppearance() {
+  try {
+    var themeId = localStorage.getItem('mcpanel_theme') || 'warm';
+    var theme   = AP_THEMES.find(function(t) { return t.id === themeId; });
+    if (theme) {
+      Object.keys(theme.vars).forEach(function(k) {
+        document.documentElement.style.setProperty(k, theme.vars[k]);
+      });
+    }
+    applyPanelIcon();
+  } catch(e) {}
+}
+
+function apBuildThemeGrid() {
+  var grid = document.getElementById('ap-theme-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  var current = localStorage.getItem('mcpanel_theme') || 'warm';
+  AP_THEMES.forEach(function(t) {
+    var card = document.createElement('div');
+    card.style.cssText = 'border-radius:8px;border:2px solid ' +
+      (t.id === current ? 'var(--accent)' : 'var(--border2)') +
+      ';padding:10px;cursor:pointer;background:var(--card2);transition:border-color .15s';
+    card.onclick = function() { apSetTheme(t.id); };
+    // Swatch row
+    var swatches = document.createElement('div');
+    swatches.style.cssText = 'display:flex;gap:4px;margin-bottom:7px';
+    t.preview.forEach(function(c) {
+      var s = document.createElement('div');
+      s.style.cssText = 'width:16px;height:16px;border-radius:3px;background:' + c;
+      swatches.appendChild(s);
+    });
+    var name = document.createElement('div');
+    name.style.cssText = 'font-size:0.7rem;font-weight:500;color:var(--text)';
+    name.textContent = t.name;
+    if (t.id === current) {
+      var check = document.createElement('span');
+      check.style.cssText = 'font-size:0.58rem;color:var(--accent);margin-left:5px';
+      check.textContent = '✓';
+      name.appendChild(check);
+    }
+    card.appendChild(swatches);
+    card.appendChild(name);
+    grid.appendChild(card);
+  });
+}
+
+function apSetTheme(id) {
+  var theme = AP_THEMES.find(function(t) { return t.id === id; });
+  if (theme) {
+    Object.keys(theme.vars).forEach(function(k) {
+      document.documentElement.style.setProperty(k, theme.vars[k]);
+    });
+  }
+  apSaveAppearance({ theme: id });
+  apBuildThemeGrid();
+  toast('Theme applied', 'ok');
+}
+
+function apResetTheme() {
+  apSetTheme('warm');
+}
+
+// ── Icon management ───────────────────────────────────────────────────────
+
+function apLoadIconFields() {
+  try {
+    var raw  = localStorage.getItem('mcpanel_icon');
+    var pref = raw ? JSON.parse(raw) : null;
+    var modeEl = document.getElementById('ap-icon-mode');
+    var valEl  = document.getElementById('ap-icon-val');
+    if (!modeEl || !valEl) return;
+    modeEl.value = pref ? (pref.mode || 'default') : 'default';
+    valEl.value  = pref ? (pref.value || '') : '';
+    apIconPreview();
+
+    var loginRaw = localStorage.getItem('mcpanel_login_icon');
+    var loginEl  = document.getElementById('ap-login-icon');
+    if (loginEl) { loginEl.value = loginRaw || ''; apLoginPreview(); }
+  } catch(e) {}
+}
+
+function apIconModeChange() {
+  var mode = document.getElementById('ap-icon-mode').value;
+  var valEl = document.getElementById('ap-icon-val');
+  valEl.placeholder = mode === 'mc' ? 'Minecraft username...' :
+                      mode === 'url' ? 'https://example.com/icon.png' : '';
+  valEl.value = '';
+  apIconPreview();
+}
+
+function apIconPreview() {
+  var mode = document.getElementById('ap-icon-mode').value;
+  var val  = (document.getElementById('ap-icon-val').value || '').trim();
+  var prev = document.getElementById('ap-icon-preview');
+  if (!prev) return;
+  if (mode === 'mc' && val) {
+    prev.innerHTML = '<img src="https://minotar.net/helm/' + encodeURIComponent(val) + '/36.png" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror="this.onerror=null;this.parentNode.textContent=\'⛰\'">';
+  } else if (mode === 'url' && val) {
+    prev.innerHTML = '<img src="' + val + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror="this.onerror=null;this.parentNode.textContent=\'⛰\'">';
+  } else {
+    prev.textContent = '⛰';
+  }
+}
+
+function apSaveIcon() {
+  var mode = document.getElementById('ap-icon-mode').value;
+  var val  = (document.getElementById('ap-icon-val').value || '').trim();
+  var iconVal = (mode === 'default') ? '' : JSON.stringify({ mode: mode, value: val });
+  apSaveAppearance({ icon: iconVal });
+  applyPanelIcon();
+  toast('Icon updated', 'ok');
+}
+
+function apResetIcon() {
+  document.getElementById('ap-icon-mode').value = 'default';
+  document.getElementById('ap-icon-val').value  = '';
+  apIconPreview();
+  apSaveAppearance({ icon: '' });
+  applyPanelIcon();
+  toast('Icon reset', 'ok');
+}
+
+function apLoginPreview() {
+  var val  = (document.getElementById('ap-login-icon').value || '').trim();
+  var prev = document.getElementById('ap-login-preview');
+  if (!prev) return;
+  if (val) {
+    prev.innerHTML = '<img src="' + val + '" style="width:100%;height:100%;object-fit:cover;border-radius:5px" onerror="this.onerror=null;this.parentNode.textContent=\'⛰\'">';
+  } else {
+    prev.textContent = '⛰';
+  }
+}
+
+function apSaveLoginIcon() {
+  var val = (document.getElementById('ap-login-icon').value || '').trim();
+  apSaveAppearance({ login_icon: val });
+  toast('Login icon saved — takes effect on next login page load', 'ok');
+}
+
+function apResetLoginIcon() {
+  document.getElementById('ap-login-icon').value = '';
+  apLoginPreview();
+  apSaveAppearance({ login_icon: '' });
+  toast('Login icon reset', 'ok');
+}
+
 function applyPanelIcon() {
   try {
     var raw  = localStorage.getItem('mcpanel_icon');
@@ -1455,7 +1719,7 @@ window.addEventListener('load', async function() {
   var isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua) ||
     (navigator.maxTouchPoints > 1 && window.innerWidth < 768);
   if (isMobile) { window.location.replace('/mobile'); return; }
-  applyPanelIcon();
+  applyAppearance(); // instant from localStorage while DB loads
   try {
     var r = await fetch('/api/auth/me');
     if (!r.ok) { window.location.replace('/login'); return; }
@@ -1463,17 +1727,16 @@ window.addEventListener('load', async function() {
     if (!data.ok) { window.location.replace(data.setup_required ? '/setup' : '/login'); return; }
     currentUser = data.username;
     currentUserRole = data.role || 'admin';
+    loadAppearance(); // sync appearance from DB (may override localStorage)
     document.getElementById('sb-avatar').textContent = currentUser[0].toUpperCase();
     document.getElementById('sb-uname').textContent = currentUser;
     var roleEl = document.getElementById('sb-user-role');
-    if (roleEl) roleEl.textContent = (data.role === 'admin') ? 'Administrator' : 'Viewer';
-    if (currentUserRole === 'viewer') { window.location.replace('/view'); return; }
+    if (roleEl) roleEl.textContent = currentUserRole === 'admin' ? 'Administrator' : currentUserRole === 'operator' ? 'Operator' : 'Viewer';
     applyRoleRestrictions();
     loadServers();
-    // Route to the right view based on URL, then kick off dashboard data
-    var onDash = window.location.pathname === '/dashboard';
-    switchView(onDash ? 'dashboard' : 'panel', true);
-    if (onDash) loadDashboard();
+    // Always open dashboard on first load; switchView handles URL state
+    switchView('dashboard', true);
+    loadDashboard();
     dashTimer = setInterval(function() {
       if (document.getElementById('view-dash').classList.contains('active')) loadDashboard();
     }, 15000);
@@ -1481,23 +1744,50 @@ window.addEventListener('load', async function() {
 });
 
 function applyRoleRestrictions() {
-  if (currentUserRole !== 'viewer') return;
-  ['tab-files','tab-mods','tab-config','tab-settings'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
+  var isAdmin    = currentUserRole === 'admin';
+  var isOperator = currentUserRole === 'operator' || isAdmin;
+  var isViewer   = currentUserRole === 'viewer';
+
+  // Tabs hidden for viewers (read-only — no console, files, mods, config, settings)
+  if (isViewer) {
+    ['tab-console','tab-files','tab-mods','tab-config','tab-settings'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  }
+  // Tabs hidden for non-admins (no user management in settings, hide new-server btn)
+  if (!isAdmin) {
+    var newSrvBtn = document.getElementById('new-server-btn');
+    if (newSrvBtn) newSrvBtn.style.display = 'none';
+  }
+  // Server controls hidden for viewers
+  if (isViewer) {
+    ['btn-start','btn-stop','btn-restart','btn-cmd','console-send-row',
+     'console-clear-btn','cmd-row'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    // Hide all server action buttons
+    document.querySelectorAll('.server-action-btn,.ctrl-btn,.con-btn-danger').forEach(function(el) {
+      el.style.display = 'none';
+    });
+  }
   var banner = document.getElementById('viewer-banner');
-  if (banner) banner.style.display = 'flex';
+  if (banner) banner.style.display = isViewer ? 'flex' : 'none';
 }
 
-function doLogout() {
-  currentUser = null;
-  clearCookie('mcpanel_user');
+async function doLogout() {
+  // Close live connections before navigating away
+  if (sseSource) { sseSource.close(); sseSource = null; }
   clearTimeout(pollTimer);
   clearTimeout(playerPollTimer);
   if (typeof statusAbortCtrl !== 'undefined' && statusAbortCtrl) { statusAbortCtrl.abort(); statusAbortCtrl = null; }
   if (typeof statusFetchInFlight !== 'undefined') statusFetchInFlight = false;
-  if (sseSource) { sseSource.close(); sseSource = null; }
+  // Clear client-side cookie
+  clearCookie('mcpanel_user');
+  currentUser = null;
+  // Tell the server to clear its HttpOnly session cookie too
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
   window.location.replace('/login');
 }
 
@@ -1506,20 +1796,46 @@ async function loadServers() {
     var res = await fetch('/api/servers');
     servers = await res.json();
   } catch(e) { servers = []; }
+
+  if (servers.length === 0) {
+    renderServerSidebar();
+    renderDashServerList();
+    showWizard();
+    return;
+  }
+
+  hideWizard();
+
+  // Ping ALL servers concurrently BEFORE rendering or selecting anything,
+  // so the running server is guaranteed to be on top.
+  try {
+    var statuses = await Promise.all(servers.map(function(s) {
+      return fetch(API + '/api/servers/' + s.id + '/status', { signal: AbortSignal.timeout(4000) })
+        .then(function(r) { return r.ok ? r.json() : { running: false }; })
+        .catch(function() { return { running: false }; });
+    }));
+    statuses.forEach(function(st, i) { servers[i].running = !!st.running; });
+  } catch(e) {}
+
+  // Sort: running servers first, preserve original order within each group
+  servers.sort(function(a, b) { return (b.running ? 1 : 0) - (a.running ? 1 : 0); });
+
   renderServerSidebar();
   renderDashServerList();
-  // Fetch running status for all servers immediately so sidebar dots are correct
+
+  // Update dots now that we have real status
+  servers.forEach(function(s) {
+    var dot = document.getElementById('srv-dot-' + s.id);
+    if (dot) dot.className = 'srv-list-dot' + (s.running ? ' on' : '');
+  });
+
+  var pathId = (window.location.pathname.match(/^\/server\/([^/]+)/) || [])[1];
+  var targetId = pathId ? decodeURIComponent(pathId) : null;
+  var found = targetId && servers.find(function(s) { return s.id === targetId; });
+  selectServer(found && targetId !== servers[0].id ? targetId : servers[0].id);
+
+  // Keep dots refreshing on the normal cycle
   refreshAllDots();
-  if (servers.length === 0) {
-    showWizard();
-  } else {
-    hideWizard();
-    var pathId = (window.location.pathname.match(/^\/server\/([^/]+)/) || [])[1];
-    var targetId = pathId ? decodeURIComponent(pathId) : null;
-    var found = targetId && servers.find(function(s) { return s.id === targetId; });
-    // First server always has priority; URL path only wins if navigating to a different server
-    selectServer(found && targetId !== servers[0].id ? targetId : servers[0].id);
-  }
 }
 
 // Fetch /api/dashboard to update all sidebar dots at once.
@@ -1538,6 +1854,13 @@ async function refreshAllDots() {
         var dot = document.getElementById('srv-dot-' + ds.id);
         if (dot) dot.className = 'srv-list-dot' + (ds.running ? ' on' : '');
       });
+      // Re-sort running servers to top and re-render sidebar so the first entry
+      // is always the active/running server
+      var prevId = currentServerId;
+      servers.sort(function(a, b) { return (b.running ? 1 : 0) - (a.running ? 1 : 0); });
+      renderServerSidebar();
+      // If no server selected yet, select the first (now guaranteed to be running if any are)
+      if (!prevId && servers.length > 0) selectServer(servers[0].id);
     }
   } catch(e) {}
 }
@@ -1549,7 +1872,7 @@ function renderServerSidebar() {
     var item = document.createElement('div');
     item.className = 'srv-list-item' + (s.id === currentServerId ? ' active' : '');
     item.id = 'srv-sidebar-' + s.id;
-    item.innerHTML = '<div class="srv-list-dot" id="srv-dot-' + s.id + '"></div>' +
+    item.innerHTML = '<div class="srv-list-dot' + (s.running ? ' on' : '') + '" id="srv-dot-' + s.id + '"></div>' +
       '<div class="srv-list-name">' + escHtml(s.name) + '</div>';
     item.onclick = function() { selectServer(s.id); };
     el.appendChild(item);
@@ -1573,6 +1896,18 @@ function selectServer(id) {
   settingsLoaded = false;
   lineCount = 0;
   activityLog = [];
+  deathsTabState = { view: 'players', players: [] };
+  // Reset deaths tab UI
+  var dGrid = document.getElementById('deaths-player-grid');
+  if (dGrid) dGrid.innerHTML = '';
+  var dEmpty = document.getElementById('deaths-player-empty');
+  if (dEmpty) dEmpty.style.display = '';
+  var dCount = document.getElementById('deaths-player-count');
+  if (dCount) dCount.textContent = '0 players';
+  var dPV = document.getElementById('deaths-player-view');
+  if (dPV) dPV.style.display = 'flex';
+  var dDV = document.getElementById('deaths-detail-view');
+  if (dDV) dDV.style.display = 'none';
   document.getElementById('console').innerHTML = '';
   document.getElementById('line-count').textContent = '0 lines';
   document.querySelectorAll('.srv-list-item').forEach(function(el) { el.classList.remove('active'); });
@@ -1589,7 +1924,8 @@ function selectServer(id) {
   fetchStatus();
   startLogStream();
   fetchPlayers();
-  goTab('console');
+  // Only switch to console on first server load; preserve tab when switching servers
+  if (!document.querySelector('.tab-panel.active')) goTab('console');
 }
 
 var wizardType = 'FABRIC';
@@ -1721,8 +2057,9 @@ function goTab(name) {
       }).catch(function(){});
     }
     if (name === 'config') fetchConfig();
-    if (name === 'activity') { renderActivityLog(); updateActivityCount(); }
   }
+  if (name === 'activity') { renderActivityLog(); updateActivityCount(); }
+  if (name === 'deaths') { loadDeathsTab(); }
   if (name === 'settings' && !settingsLoaded) { settingsLoaded = true; loadSettings(); }
   if (name === 'config') fetchConfig();
   if (name === 'overview') fetchStatus();
@@ -1980,6 +2317,31 @@ function parseLogEvent(raw) {
              time: timeStr, isBedrock: player.charAt(0) === '.' };
   }
 
+  // Villager / named entity death
+  // Format: Named entity class_XXXX['Name'/ID, l='ServerLevel[dim]', x=X, y=Y, z=Z] died: Name was <msg>
+  var villagerMatch = msg.match(/^Named entity [A-Za-z0-9_.]+\['([^']+)'\/(\d+),\s*l='ServerLevel\[([^\]]+)\]',\s*x=([\d.-]+),\s*y=([\d.-]+),\s*z=([\d.-]+)\] died:\s*(.+)$/);
+  if (villagerMatch) {
+    var vName   = villagerMatch[1];
+    var vDim    = villagerMatch[3];
+    var vX      = parseFloat(villagerMatch[4]).toFixed(1);
+    var vY      = parseFloat(villagerMatch[5]).toFixed(1);
+    var vZ      = parseFloat(villagerMatch[6]).toFixed(1);
+    var vMsg    = villagerMatch[7].trim();
+    // Extract killer from the death message if present ("X was slain by Y" -> Y)
+    var killerMatch = vMsg.match(/(?:was slain by|was shot by|was killed by|was blown up by)\s+([\S]+)\s*(?:using|$)/);
+    var vKiller = killerMatch ? killerMatch[1] : null;
+    return {
+      type: 'villager_death',
+      player: vName,
+      msg: vMsg,
+      time: timeStr,
+      isBedrock: false,
+      dim: vDim,
+      coords: 'x:' + vX + ' y:' + vY + ' z:' + vZ,
+      killer: vKiller
+    };
+  }
+
   // Death — player name is always first token(s) before a known death phrase
   var msgLo = msg.toLowerCase();
   for (var i = 0; i < DEATH_PATTERNS.length; i++) {
@@ -2001,11 +2363,10 @@ function parseLogEvent(raw) {
 
 function addActivityEvent(event) {
   if (!event) return;
-  // Dedup: if the last few entries already have the same type+player+time
+  // Dedup: if any entry already has the same type+player+time
   // (can happen when SSE replays lines that were already loaded from the DB),
   // silently drop it.
-  var recent = activityLog.slice(-10);
-  var isDup = recent.some(function(e) {
+  var isDup = activityLog.some(function(e) {
     return e.type === event.type && e.player === event.player && e.time === event.time;
   });
   if (isDup) return;
@@ -2018,6 +2379,8 @@ function addActivityEvent(event) {
   }
   // Update count badge regardless
   updateActivityCount();
+  // Keep deaths tab live if open
+  deathsTabLiveUpdate(event);
 }
 
 function updateActivityCount() {
@@ -2055,16 +2418,22 @@ function appendActivityEntry(event) {
 }
 
 function buildActivityEntry(event) {
+  var isVillager = event.type === 'villager_death';
   var isBedrock = event.isBedrock;
   var displayName = isBedrock ? event.player.slice(1) : event.player;
 
   var entry = document.createElement('div');
   entry.className = 'activity-entry';
 
-  // Avatar
+  // Avatar — villager gets a fixed emoji, players get a head
   var av = document.createElement('div');
   av.className = 'activity-av';
-  av.textContent = displayName.slice(0,2).toUpperCase();
+  if (isVillager) {
+    av.textContent = '🐾';
+    av.style.fontSize = '14px';
+  } else {
+    av.textContent = displayName.slice(0,2).toUpperCase();
+  }
 
   // Event icon
   var icon = document.createElement('div');
@@ -2076,13 +2445,22 @@ function buildActivityEntry(event) {
   body.className = 'activity-body';
   var nameEl = document.createElement('div');
   nameEl.className = 'activity-name';
-  nameEl.textContent = event.player;
+  nameEl.textContent = isVillager ? event.player + ' (villager)' : event.player;
   var msgEl = document.createElement('div');
-  msgEl.className = 'activity-msg' + (event.type === 'death' ? ' death' : '');
-  msgEl.textContent = event.type === 'death' ? event.msg : event.msg;
+  msgEl.className = 'activity-msg death';
+  msgEl.textContent = event.msg;
   msgEl.title = event.msg;
   body.appendChild(nameEl);
   body.appendChild(msgEl);
+  // Villager: show dimension + coords + killer
+  if (isVillager) {
+    var locEl = document.createElement('div');
+    locEl.className = 'activity-loc';
+    var locText = event.dim + ' · ' + event.coords;
+    if (event.killer) locText += ' · killed by ' + event.killer;
+    locEl.textContent = locText;
+    body.appendChild(locEl);
+  }
 
   // Right side: time + event badge + platform badge
   var right = document.createElement('div');
@@ -2092,21 +2470,23 @@ function buildActivityEntry(event) {
   timeEl.textContent = event.time;
   var evBadge = document.createElement('span');
   evBadge.className = 'activity-badge ' + event.type;
-  evBadge.textContent = event.type === 'join' ? 'JOIN' : event.type === 'leave' ? 'LEAVE' : 'DEATH';
-  var typeBadge = document.createElement('span');
-  typeBadge.className = 'activity-type-badge ' + (isBedrock ? 'bedrock' : 'java');
-  typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+  evBadge.textContent = isVillager ? 'VILLAGER' : event.type === 'join' ? 'JOIN' : event.type === 'leave' ? 'LEAVE' : 'DEATH';
   right.appendChild(timeEl);
   right.appendChild(evBadge);
-  right.appendChild(typeBadge);
+  if (!isVillager) {
+    var typeBadge = document.createElement('span');
+    typeBadge.className = 'activity-type-badge ' + (isBedrock ? 'bedrock' : 'java');
+    typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+    right.appendChild(typeBadge);
+  }
 
   entry.appendChild(av);
   entry.appendChild(icon);
   entry.appendChild(body);
   entry.appendChild(right);
 
-  // Load head async
-  loadActivityHead(displayName, isBedrock, av);
+  // Load player head (skip for villagers)
+  if (!isVillager) loadActivityHead(displayName, isBedrock, av);
 
   return entry;
 }
@@ -2162,7 +2542,330 @@ function renderActivityHeadFromUrl(url, avEl, isBedrock) {
   img.src = url;
 }
 
-function clearActivityLog() {
+// ── Death log tab ─────────────────────────────────────────────────────────
+
+var deathsTabState = { view: 'players', players: [] };
+
+async function loadDeathsTab() {
+  if (!currentServerId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/deaths');
+    if (!res.ok) return;
+    var players = await res.json();
+    deathsTabState.players = players;
+    renderDeathsPlayerGrid(players);
+  } catch(e) {}
+}
+
+function renderDeathsPlayerGrid(players) {
+  var grid = document.getElementById('deaths-player-grid');
+  var empty = document.getElementById('deaths-player-empty');
+  var countEl = document.getElementById('deaths-player-count');
+  if (!grid) return;
+  if (countEl) countEl.textContent = (players.length + 1) + ' entries';
+  grid.innerHTML = '';
+  if (empty) empty.style.display = 'none';
+
+  // ── Villagers card (always shown first) ───────────────────────────────
+  var vCard = document.createElement('div');
+  vCard.style.cssText = 'background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;cursor:pointer;transition:border-color .15s';
+  vCard.onmouseenter = function() { vCard.style.borderColor = 'var(--amber)'; };
+  vCard.onmouseleave = function() { vCard.style.borderColor = 'var(--border2)'; };
+  vCard.onclick = openVillagerDeaths;
+
+  var vTop = document.createElement('div');
+  vTop.style.cssText = 'display:flex;align-items:center;gap:7px;margin-bottom:6px';
+
+  var vIcon = document.createElement('div');
+  vIcon.className = 'activity-av';
+  vIcon.style.cssText = 'width:30px;height:30px;border-radius:5px;background:rgba(212,164,90,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden';
+  var vImg = document.createElement('img');
+  vImg.src = 'https://cdn.modrinth.com/data/7L6RRxjO/fa51cf93cf6f19ea5ce731bb353eb0ff6e1d5eea.png';
+  vImg.style.cssText = 'width:30px;height:30px;image-rendering:pixelated';
+  vImg.onerror = function() { vIcon.textContent = '🗺'; };
+  vIcon.appendChild(vImg);
+
+  var vName = document.createElement('div');
+  vName.style.cssText = 'font-size:0.74rem;font-weight:500;font-family:var(--mono);flex:1;min-width:0';
+  vName.textContent = 'Villagers';
+
+  var vBadge = document.createElement('span');
+  vBadge.style.cssText = 'font-size:0.5rem;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(212,164,90,.1);color:var(--amber);border:1px solid rgba(212,164,90,.25)';
+  vBadge.textContent = 'NPC';
+
+  vTop.appendChild(vIcon); vTop.appendChild(vName); vTop.appendChild(vBadge);
+
+  var vSub = document.createElement('div');
+  vSub.style.cssText = 'font-size:0.6rem;color:var(--muted2)';
+  vSub.textContent = 'Named villager deaths';
+
+  vCard.appendChild(vTop); vCard.appendChild(vSub);
+  grid.appendChild(vCard);
+
+  // ── Player cards ──────────────────────────────────────────────────────
+  if (players.length === 0) {
+    return;
+  }
+  players.forEach(function(p) {
+    var isBedrock = p.player.charAt(0) === '.';
+    var displayName = isBedrock ? p.player.slice(1) : p.player;
+    var card = document.createElement('div');
+    card.style.cssText = 'background:var(--card2);border:1px solid var(--border2);border-radius:6px;padding:10px 12px;cursor:pointer;transition:border-color .15s';
+    card.onmouseenter = function() { card.style.borderColor = 'var(--red)'; };
+    card.onmouseleave = function() { card.style.borderColor = 'var(--border2)'; };
+    card.onclick = function() { openDeathDetail(p.player); };
+
+    var top = document.createElement('div');
+    top.style.cssText = 'display:flex;align-items:center;gap:7px;margin-bottom:6px';
+
+    // Avatar — use activity-av class so canvas sizing CSS applies
+    var av = document.createElement('div');
+    av.className = 'activity-av';
+    av.textContent = displayName.slice(0,2).toUpperCase();
+    // Load head via the same loader activity log uses (GeyserMC for Bedrock, Minotar for Java)
+    loadActivityHead(displayName, isBedrock, av);
+
+    var nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:0.74rem;font-weight:500;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0';
+    nameEl.textContent = displayName;
+
+    // Platform badge — same as activity log
+    var typeBadge = document.createElement('span');
+    typeBadge.className = 'activity-type-badge ' + (isBedrock ? 'bedrock' : 'java');
+    typeBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+
+    top.appendChild(av);
+    top.appendChild(nameEl);
+    top.appendChild(typeBadge);
+
+    var stats = document.createElement('div');
+    stats.style.cssText = 'display:flex;align-items:center;justify-content:space-between';
+
+    var deathBadge = document.createElement('span');
+    deathBadge.style.cssText = 'font-size:0.62rem;background:rgba(212,99,90,.12);color:var(--red);border:1px solid rgba(212,99,90,.2);border-radius:3px;padding:1px 6px;font-family:var(--mono)';
+    deathBadge.textContent = '☠ ' + p.deaths;
+
+    var lastEl = document.createElement('span');
+    lastEl.style.cssText = 'font-size:0.58rem;color:var(--muted2);font-family:var(--mono)';
+    var d = new Date(p.last_ts);
+    lastEl.textContent = d.toLocaleDateString([], {month:'short',day:'numeric'});
+
+    stats.appendChild(deathBadge);
+    stats.appendChild(lastEl);
+
+    card.appendChild(top);
+    card.appendChild(stats);
+    grid.appendChild(card);
+  });
+}
+
+async function openDeathDetail(player) {
+  if (!currentServerId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/deaths/' + encodeURIComponent(player));
+    if (!res.ok) return;
+    var events = await res.json();
+    var isBedrock = player.charAt(0) === '.';
+    var displayName = isBedrock ? player.slice(1) : player;
+
+    document.getElementById('deaths-player-view').style.display = 'none';
+    var detailView = document.getElementById('deaths-detail-view');
+    detailView.style.display = 'flex';
+
+    // Header: name + platform badge
+    var nameEl = document.getElementById('deaths-detail-name');
+    nameEl.textContent = displayName;
+    // Remove any previous platform badge that was injected
+    var oldBadge = document.getElementById('deaths-detail-platform-badge');
+    if (oldBadge) oldBadge.remove();
+    var platBadge = document.createElement('span');
+    platBadge.id = 'deaths-detail-platform-badge';
+    platBadge.className = 'activity-type-badge ' + (isBedrock ? 'bedrock' : 'java');
+    platBadge.textContent = isBedrock ? 'Bedrock' : 'Java';
+    nameEl.parentNode.insertBefore(platBadge, nameEl.nextSibling);
+
+    var countEl = document.getElementById('deaths-detail-count');
+    if (countEl) countEl.textContent = events.length + ' death' + (events.length !== 1 ? 's' : '');
+
+    var list = document.getElementById('deaths-detail-list');
+    list.innerHTML = '';
+    if (events.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted2);font-size:0.76rem">No deaths recorded</div>';
+      return;
+    }
+    events.forEach(function(ev) {
+      var row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:5px';
+
+      var icon = document.createElement('div');
+      icon.style.cssText = 'width:22px;height:22px;border-radius:4px;background:rgba(212,99,90,.12);display:flex;align-items:center;justify-content:center;font-size:0.68rem;flex-shrink:0;margin-top:1px';
+      icon.textContent = '☠';
+
+      var body = document.createElement('div');
+      body.style.cssText = 'flex:1;min-width:0';
+
+      var msg = document.createElement('div');
+      msg.style.cssText = 'font-size:0.72rem;color:var(--amber);line-height:1.4';
+      msg.textContent = ev.detail;
+      body.appendChild(msg);
+
+      // Location — dimension pill + coordinates (populated by RCON after death)
+      if (ev.dim || ev.coords) {
+        var loc = document.createElement('div');
+        loc.style.cssText = 'display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap';
+        if (ev.dim) {
+          var dimEl = document.createElement('span');
+          dimEl.style.cssText = 'font-size:0.58rem;color:var(--muted);font-family:var(--mono);background:var(--card);border:1px solid var(--border2);padding:1px 4px;border-radius:3px';
+          dimEl.textContent = ev.dim.replace('minecraft:', '');
+          loc.appendChild(dimEl);
+        }
+        if (ev.coords) {
+          var coordEl = document.createElement('span');
+          coordEl.style.cssText = 'font-size:0.58rem;color:var(--muted2);font-family:var(--mono)';
+          coordEl.textContent = ev.coords.split(',').map(function(v) { return parseFloat(v).toFixed(1); }).join(', ');
+          loc.appendChild(coordEl);
+        }
+        body.appendChild(loc);
+      }
+
+      var ts = document.createElement('div');
+      ts.style.cssText = 'font-size:0.6rem;color:var(--muted2);font-family:var(--mono);margin-top:3px';
+      var d = new Date(ev.ts);
+      ts.textContent = d.toLocaleDateString([], {year:'numeric',month:'short',day:'numeric'}) + '  ' +
+                       d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+      body.appendChild(ts);
+      row.appendChild(icon);
+      row.appendChild(body);
+      list.appendChild(row);
+    });
+  } catch(e) {}
+}
+
+function showDeathsPlayerView() {
+  document.getElementById('deaths-detail-view').style.display = 'none';
+  document.getElementById('deaths-player-view').style.display = 'flex';
+}
+
+async function openVillagerDeaths() {
+  if (!currentServerId) return;
+  try {
+    var res = await fetch(API + '/api/servers/' + currentServerId + '/deaths/villagers');
+    if (!res.ok) return;
+    var rows = await res.json();
+
+    document.getElementById('deaths-player-view').style.display = 'none';
+    var detailView = document.getElementById('deaths-detail-view');
+    detailView.style.display = 'flex';
+
+    var nameEl = document.getElementById('deaths-detail-name');
+    nameEl.textContent = 'Villagers';
+    var oldBadge = document.getElementById('deaths-detail-platform-badge');
+    if (oldBadge) oldBadge.remove();
+    var vilBadge = document.createElement('span');
+    vilBadge.id = 'deaths-detail-platform-badge';
+    vilBadge.style.cssText = 'font-size:0.5rem;font-weight:600;padding:1px 5px;border-radius:3px;background:rgba(212,164,90,.1);color:var(--amber);border:1px solid rgba(212,164,90,.25)';
+    vilBadge.textContent = 'NPC';
+    nameEl.parentNode.insertBefore(vilBadge, nameEl.nextSibling);
+
+    var countEl = document.getElementById('deaths-detail-count');
+    if (countEl) countEl.textContent = rows.length + ' death' + (rows.length !== 1 ? 's' : '');
+
+    var list = document.getElementById('deaths-detail-list');
+    list.innerHTML = '';
+    if (rows.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:32px 0;color:var(--muted2);font-size:0.76rem">No villager deaths recorded</div>';
+      return;
+    }
+    rows.forEach(function(row) {
+      var vd = null;
+      try { vd = JSON.parse(row.detail || '{}'); } catch(e) { vd = {}; }
+
+      var entry = document.createElement('div');
+      entry.style.cssText = 'display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--card2);border:1px solid var(--border2);border-radius:5px';
+
+      var icon = document.createElement('div');
+      icon.style.cssText = 'width:22px;height:22px;border-radius:4px;background:rgba(212,164,90,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;overflow:hidden';
+      var iImg = document.createElement('img');
+      iImg.src = 'https://cdn.modrinth.com/data/7L6RRxjO/fa51cf93cf6f19ea5ce731bb353eb0ff6e1d5eea.png';
+      iImg.style.cssText = 'width:22px;height:22px;image-rendering:pixelated';
+      iImg.onerror = function() { icon.textContent = '🗺'; };
+      icon.appendChild(iImg);
+
+      var body = document.createElement('div');
+      body.style.cssText = 'flex:1;min-width:0';
+
+      // Villager name
+      var nameRow = document.createElement('div');
+      nameRow.style.cssText = 'display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap';
+      var vName = document.createElement('span');
+      vName.style.cssText = 'font-size:0.72rem;font-weight:600;font-family:var(--mono)';
+      vName.textContent = row.player;
+      nameRow.appendChild(vName);
+
+      // Death message
+      var msg = document.createElement('div');
+      msg.style.cssText = 'font-size:0.7rem;color:var(--amber);line-height:1.4;margin-bottom:3px';
+      msg.textContent = vd.msg || row.detail || 'died';
+
+      // Coords + dimension
+      var meta = document.createElement('div');
+      meta.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+      if (vd.dim) {
+        var dim = document.createElement('span');
+        dim.style.cssText = 'font-size:0.58rem;color:var(--muted);font-family:var(--mono);background:var(--card);border:1px solid var(--border2);padding:1px 4px;border-radius:3px';
+        dim.textContent = vd.dim;
+        meta.appendChild(dim);
+      }
+      if (vd.x !== undefined) {
+        var coords = document.createElement('span');
+        coords.style.cssText = 'font-size:0.58rem;color:var(--muted2);font-family:var(--mono)';
+        coords.textContent = parseFloat(vd.x).toFixed(1) + ', ' + parseFloat(vd.y).toFixed(1) + ', ' + parseFloat(vd.z).toFixed(1);
+        meta.appendChild(coords);
+      }
+
+      body.appendChild(nameRow);
+      body.appendChild(msg);
+      body.appendChild(meta);
+
+      // Timestamp
+      var d = new Date(row.ts);
+      var timeEl = document.createElement('div');
+      timeEl.style.cssText = 'font-size:0.58rem;color:var(--muted2);font-family:var(--mono);white-space:nowrap;flex-shrink:0';
+      timeEl.textContent = d.getHours().toString().padStart(2,'0') + ':' +
+                           d.getMinutes().toString().padStart(2,'0') + ':' +
+                           d.getSeconds().toString().padStart(2,'0');
+
+      entry.appendChild(icon); entry.appendChild(body); entry.appendChild(timeEl);
+      list.appendChild(entry);
+    });
+  } catch(e) {}
+}
+
+// Called from addActivityEvent when a new death comes in live
+function deathsTabLiveUpdate(event) {
+  if (event.type !== 'death') return;
+  var panel = document.getElementById('panel-deaths');
+  if (!panel || !panel.classList.contains('active')) return;
+  var detailView = document.getElementById('deaths-detail-view');
+  // If we're in the player grid view, reload it
+  if (detailView.style.display === 'none' || detailView.style.display === '') {
+    loadDeathsTab();
+  } else {
+    // If viewing the same player's details, reload that
+    var nameEl = document.getElementById('deaths-detail-name');
+    var isBedrock = event.player.charAt(0) === '.';
+    var displayName = isBedrock ? event.player.slice(1) : event.player;
+    if (nameEl && nameEl.textContent === displayName) {
+      openDeathDetail(event.player);
+    }
+  }
+}
+
+async function clearActivityLog() {
+  try {
+    await fetch(API + '/api/servers/' + currentServerId + '/activity/clear', { method: 'POST' });
+  } catch(e) {}
   activityLog = [];
   renderActivityLog();
   updateActivityCount();
@@ -2181,13 +2884,31 @@ async function fetchActivityHistory(serverId) {
       var timeStr = d.getHours().toString().padStart(2,'0') + ':' +
                     d.getMinutes().toString().padStart(2,'0') + ':' +
                     d.getSeconds().toString().padStart(2,'0');
-      activityLog.push({
-        type:      row.event,
-        player:    row.player,
-        msg:       row.detail || (row.event === 'join' ? 'joined the game' : row.event === 'leave' ? 'left the game' : 'died'),
-        time:      timeStr,
-        isBedrock: row.player.charAt(0) === '.'
-      });
+      var event;
+      if (row.event === 'villager_death') {
+        // detail is JSON: { villager:true, msg, dim, x, y, z }
+        try {
+          var vd = JSON.parse(row.detail);
+          var killerMatch = vd.msg.match(/(?:was slain by|was shot by|was killed by|was blown up by)\s+(\S+)/);
+          event = {
+            type: 'villager_death', player: row.player, msg: vd.msg, time: timeStr,
+            isBedrock: false, dim: vd.dim,
+            coords: 'x:' + parseFloat(vd.x).toFixed(1) + ' y:' + parseFloat(vd.y).toFixed(1) + ' z:' + parseFloat(vd.z).toFixed(1),
+            killer: killerMatch ? killerMatch[1] : null
+          };
+        } catch(e) {
+          event = { type: 'death', player: row.player, msg: row.detail || 'died', time: timeStr, isBedrock: false };
+        }
+      } else {
+        event = {
+          type:      row.event,
+          player:    row.player,
+          msg:       row.detail || (row.event === 'join' ? 'joined the game' : row.event === 'leave' ? 'left the game' : 'died'),
+          time:      timeStr,
+          isBedrock: row.player.charAt(0) === '.'
+        };
+      }
+      activityLog.push(event);
     });
     if (activityLog.length > ACTIVITY_MAX) activityLog = activityLog.slice(-ACTIVITY_MAX);
     renderActivityLog();
@@ -2196,8 +2917,11 @@ async function fetchActivityHistory(serverId) {
 }
 
 function makeLogDiv(raw) {
-  // Parse for player activity events on every incoming line
-  addActivityEvent(parseLogEvent(raw));
+  // Parse for player activity events on live lines only.
+  // During SSE snapshot replay (replayFlushing=true), the history was already
+  // loaded from the DB by fetchActivityHistory — re-parsing here would create
+  // duplicate entries (notably false "joined the game" events after deaths).
+  if (!replayFlushing) addActivityEvent(parseLogEvent(raw));
   var div = document.createElement('div');
   var lo = raw.toLowerCase();
   var cls = 'log-line';
@@ -2708,7 +3432,7 @@ async function loadUsers() {
         '<span class="user-role-badge ' + u.role + '">' + u.role + '</span>' +
         (!isSelf ? '<button class="mod-btn mod-btn-remove" style="margin-left:3px" onclick="deleteUser(\'' + escHtml(u.username) + '\')">Remove</button>' : '');
       wrap.appendChild(row);
-      if (u.role === 'viewer' && !isSelf) {
+      if ((u.role === 'viewer' || u.role === 'operator') && !isSelf) {
         var accessRow = document.createElement('div');
         accessRow.style.cssText = 'margin-top:5px;padding:7px 9px;background:var(--card2);border:1px solid var(--border);border-radius:5px';
         var allowed = u.allowed_servers || [];
@@ -2775,10 +3499,16 @@ function openProfile() {
   var rl = document.getElementById('profile-role');
   if (av) av.textContent = (currentUser || 'A')[0].toUpperCase();
   if (nm) nm.textContent = currentUser || '';
-  if (rl) rl.textContent = currentUserRole === 'admin' ? 'Administrator' : 'Viewer';
+  if (rl) rl.textContent = currentUserRole === 'admin' ? 'Administrator' : currentUserRole === 'operator' ? 'Operator' : 'Viewer';
+  var isAdmin = currentUserRole === 'admin';
+  // Users section — admin only
   var sec = document.getElementById('prof-users-section');
-  if (sec) sec.style.display = currentUserRole === 'admin' ? '' : 'none';
-  if (currentUserRole === 'admin') loadUsers();
+  if (sec) sec.style.display = isAdmin ? '' : 'none';
+  if (isAdmin) loadUsers();
+  // Appearance section — admin only
+  var apSec = document.getElementById('prof-appearance-section');
+  if (apSec) apSec.style.display = isAdmin ? '' : 'none';
+  if (isAdmin) { apBuildThemeGrid(); apLoadIconFields(); }
   document.getElementById('profile-overlay').style.display = 'flex';
   var np = document.getElementById('prof-pass-new');
   var nc = document.getElementById('prof-pass-confirm');
@@ -3376,10 +4106,47 @@ window.addEventListener('popstate', function(e) {
             <div><label class="st-label">Username</label><input class="st-input" id="new-user-name" type="text" placeholder="username" style="width:100%;margin-top:3px"></div>
             <div><label class="st-label">Password</label><input class="st-input" id="new-user-pass" type="password" placeholder="password" style="width:100%;margin-top:3px"></div>
           </div>
-          <div style="margin-bottom:9px"><label class="st-label">Role</label><select class="st-select" id="new-user-role" style="width:100%;margin-top:3px"><option value="viewer">Viewer — status &amp; controls only</option><option value="admin">Admin — full access</option></select></div>
+          <div style="margin-bottom:9px"><label class="st-label">Role</label><select class="st-select" id="new-user-role" style="width:100%;margin-top:3px"><option value="viewer">Viewer — read-only status &amp; logs</option><option value="operator">Operator — manage servers, no user admin</option><option value="admin">Admin — full access</option></select></div>
           <button class="save-btn" onclick="createUser()" style="width:100%">Add User</button>
         </div>
       </div>
+      <div class="profile-section" id="prof-appearance-section" style="display:none">
+        <div class="profile-section-title">Appearance</div>
+        <!-- Theme grid -->
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:8px">Theme</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;margin-bottom:12px" id="ap-theme-grid"></div>
+        <button class="act-btn" onclick="apResetTheme()" style="margin-bottom:14px">Reset to Default Theme</button>
+
+        <!-- Panel icon -->
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:6px">Panel &amp; Server Icon</div>
+        <div style="font-size:0.62rem;color:var(--muted2);margin-bottom:7px">Use a Minecraft username or image URL. Shown in the sidebar and server cards.</div>
+        <div style="display:flex;gap:7px;margin-bottom:7px;align-items:center">
+          <select id="ap-icon-mode" class="st-input" style="width:110px;flex-shrink:0" onchange="apIconModeChange()">
+            <option value="default">Default ⛰</option>
+            <option value="mc">MC Username</option>
+            <option value="url">Image URL</option>
+          </select>
+          <input id="ap-icon-val" class="st-input" style="flex:1" placeholder="Username or URL..." oninput="apIconPreview()">
+          <div id="ap-icon-preview" style="width:32px;height:32px;border-radius:6px;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;overflow:hidden">⛰</div>
+        </div>
+        <div style="display:flex;gap:7px;margin-bottom:14px">
+          <button class="act-btn" onclick="apSaveIcon()">Apply Icon</button>
+          <button class="act-btn" onclick="apResetIcon()">Reset</button>
+        </div>
+
+        <!-- Login page icon -->
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:6px">Login Page Icon</div>
+        <div style="font-size:0.62rem;color:var(--muted2);margin-bottom:7px">Icon shown on the sign-in screen. Paste an image URL.</div>
+        <div style="display:flex;gap:7px;margin-bottom:7px;align-items:center">
+          <input id="ap-login-icon" class="st-input" style="flex:1" placeholder="https://..." oninput="apLoginPreview()">
+          <div id="ap-login-preview" style="width:32px;height:32px;border-radius:6px;background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;overflow:hidden">⛰</div>
+        </div>
+        <div style="display:flex;gap:7px">
+          <button class="act-btn" onclick="apSaveLoginIcon()">Apply Login Icon</button>
+          <button class="act-btn" onclick="apResetLoginIcon()">Reset</button>
+        </div>
+      </div>
+
       <button onclick="doLogout()" style="width:100%;background:transparent;border:1px solid var(--border);border-radius:5px;padding:8px;font-family:var(--font);font-size:0.78rem;color:var(--muted);cursor:pointer;transition:color .1s,border-color .1s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--border2)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">Sign out</button>
     </div>
   </div>

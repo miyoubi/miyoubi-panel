@@ -11,7 +11,7 @@
 //! Duplicate lines within a 2-second window are dropped.
 
 use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use once_cell::sync::Lazy;
@@ -35,12 +35,12 @@ static RE_INFO_PREFIX: Lazy<Regex> = Lazy::new(|| {
 
 /// Player joined: "Steve joined the game"
 static RE_JOIN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(.+) joined the game$").unwrap()
+    Regex::new(r"^([A-Za-z0-9_.\-]{1,36}) joined the game$").unwrap()
 });
 
 /// Player left: "Steve left the game"
 static RE_LEAVE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^(.+) left the game$").unwrap()
+    Regex::new(r"^([A-Za-z0-9_.\-]{1,36}) left the game$").unwrap()
 });
 
 /// Player/mob death message — Minecraft emits these as:
@@ -57,10 +57,13 @@ static RE_PLAYER_DEATH: Lazy<Regex> = Lazy::new(|| {
     ).unwrap()
 });
 
-/// Named villager / mob death:
-///   Villager class_1646['Bart'/70, l='...', x=…] died, message: 'Bart was slain by Zombie'
+/// Named villager / mob death — actual Minecraft/Fabric format:
+///   Named entity class_3989['Russel'/24, l='ServerLevel[world]', x=25.35, y=62.61, z=525.68] died: Russel was slain by .Yuki67139
+/// Captures: (name, dimension, x, y, z, death_message)
 static RE_MOB_DEATH: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^\S+\['([^']+)'/\d+.*\] died, message: '(.+)'$"#).unwrap()
+    Regex::new(
+        r"^Named entity \S+\['([^']+)'/\d+,\s*l='ServerLevel\[([^\]]+)\]',\s*x=([\d.\-]+),\s*y=([\d.\-]+),\s*z=([\d.\-]+)\] died:\s*(.+)$"
+    ).unwrap()
 });
 
 /// Parse a raw console line and return `Some((event, player, detail))` if it
@@ -76,9 +79,24 @@ fn parse_activity(line: &str) -> Option<(&'static str, String, Option<String>)> 
         return Some(("leave", c[1].to_string(), None));
     }
     // Named mob death (e.g. named villager) — produces a death entry using
-    // the name inside the brackets and the full death message as detail.
+    // the name inside the brackets and a JSON detail with dim, coords, and message.
     if let Some(c) = RE_MOB_DEATH.captures(payload) {
-        return Some(("death", c[1].to_string(), Some(c[2].to_string())));
+        let name   = c[1].to_string();
+        let dim    = c[2].to_string();
+        let x      = c[3].to_string();
+        let y      = c[4].to_string();
+        let z      = c[5].to_string();
+        let msg    = c[6].to_string();
+        // Encode all fields as JSON so the frontend can reconstruct the card
+        let detail = serde_json::json!({
+            "villager": true,
+            "msg": msg,
+            "dim": dim,
+            "x": x,
+            "y": y,
+            "z": z
+        }).to_string();
+        return Some(("villager_death", name, Some(detail)));
     }
     // Player death — player name + death verb, detail is the full message.
     if let Some(c) = RE_PLAYER_DEATH.captures(payload) {
@@ -106,27 +124,30 @@ pub struct LogBuffer {
     db:        crate::db::Db,
     inner:     Mutex<Inner>,
     tx:        broadcast::Sender<LogLine>,
+    /// Set after construction so logbuffer can fire RCON commands without
+    /// a circular dependency at build time.
+    docker:    std::sync::OnceLock<Arc<crate::docker::DockerClient>>,
 }
 
 impl LogBuffer {
-    /// Create a new buffer for `server_id`, loading existing history from the DB.
     pub fn new(server_id: impl Into<String>, db: crate::db::Db) -> Self {
         let server_id = server_id.into();
         let (tx, _) = broadcast::channel(1024);
-
-        // Load persisted history.
         let history = db.log_load(&server_id, MAX_LINES).unwrap_or_default();
         let now = Instant::now();
-        let buf = history.into_iter()
-            .map(|l| (now, l))
-            .collect::<VecDeque<_>>();
-
+        let buf = history.into_iter().map(|l| (now, l)).collect::<VecDeque<_>>();
         Self {
             server_id,
             db,
             inner: Mutex::new(Inner { buf }),
             tx,
+            docker: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Wire up the docker client so that death-location queries can be fired.
+    pub fn set_docker(&self, docker: Arc<crate::docker::DockerClient>) {
+        let _ = self.docker.set(docker);
     }
 
     /// Push a line: sanitise → dedup → store in memory + DB → broadcast.
@@ -192,6 +213,32 @@ impl LogBuffer {
                         self.server_id, event, player, e
                     );
                 }
+                // Also write to the per-player death log table.
+                if event == "death" {
+                    let msg = detail.as_deref().unwrap_or("died");
+                    match self.db.death_log_append(&self.server_id, &player, msg) {
+                        Ok(row_id) => {
+                            // Spawn a task to query LastDeathLocation via RCON
+                            // and update the row once we get coords back.
+                            if let Some(docker) = self.docker.get().cloned() {
+                                let db2       = self.db.clone();
+                                let srv_id    = self.server_id.clone();
+                                let player2   = player.clone();
+                                tokio::spawn(async move {
+                                    fetch_and_store_death_location(
+                                        docker, db2, srv_id, player2, row_id,
+                                    ).await;
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "death_log_append failed for {} ({}): {}",
+                                self.server_id, player, e
+                            );
+                        }
+                    }
+                }
             }
         }
 
@@ -224,5 +271,59 @@ impl LogBuffer {
         if let Err(e) = self.db.log_clear(&self.server_id) {
             tracing::warn!("log_clear failed for {}: {}", self.server_id, e);
         }
+    }
+}
+
+/// Fired in a background task after each player death.
+/// Sends `/data get entity <player> LastDeathLocation` via RCON, parses the
+/// coordinates + dimension from the output, then patches the DB row.
+///
+/// Minecraft output looks like (may vary by version/mod):
+///   <player> has the following entity data: {pos: [25.0d, 64.0d, 100.0d], dimension: "minecraft:overworld"}
+/// Or for older formats:
+///   Data value of <player> is: {dim: 0, pos: [25.0d, 64.0d, 100.0d]}
+async fn fetch_and_store_death_location(
+    docker:  Arc<crate::docker::DockerClient>,
+    db:      crate::db::Db,
+    srv_id:  String,
+    player:  String,
+    row_id:  i64,
+) {
+    // Small delay so the player is properly dead before we query
+    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+
+    let cmd = format!("data get entity {} LastDeathLocation", player);
+    let output = match docker.send_command(&cmd).await {
+        Ok(o) => o,
+        Err(e) => {
+            tracing::debug!("LastDeathLocation cmd failed for {}: {}", player, e);
+            return;
+        }
+    };
+
+    // Parse coords: [Xd, Yd, Zd]  (the 'd' suffix is Minecraft's double tag)
+    // Handles both integer arrays [I; x, y, z] and doubles [xd, yd, zd]
+    let pos_re = Regex::new(r"\[(?:I;\s*)?([+-]?\d+(?:\.\d+)?)[dD]?,\s*([+-]?\d+(?:\.\d+)?)[dD]?,\s*([+-]?\d+(?:\.\d+)?)[dD]?\]").unwrap();
+    let coords = if let Some(cap) = pos_re.captures(&output) {
+        Some((cap[1].to_string(), cap[2].to_string(), cap[3].to_string()))
+    } else {
+        tracing::debug!("Could not parse coords from LastDeathLocation output: {}", output);
+        None
+    };
+
+    // Parse dimension: "minecraft:overworld" → "overworld"
+    let dim_re = Regex::new(r#"dimension:\s*"(?:minecraft:)?([^"]+)""#).unwrap();
+    let dim = dim_re.captures(&output)
+        .map(|c| c[1].to_string());
+
+    if coords.is_none() && dim.is_none() {
+        return; // Nothing useful to store
+    }
+
+    let coords_str = coords.as_ref().map(|(x, y, z)| format!("{},{},{}", x, y, z));
+    if let Err(e) = db.death_log_update_coords(
+        &srv_id, row_id, dim.as_deref(), coords_str.as_deref(),
+    ) {
+        tracing::warn!("death_log_update_coords failed for {} row {}: {}", player, row_id, e);
     }
 }
